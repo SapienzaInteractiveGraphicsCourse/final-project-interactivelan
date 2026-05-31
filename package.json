@@ -1,0 +1,18 @@
+{
+  "name": "staticdefense",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "simplex-noise": "^4.0.3",
+    "three": "^0.184.0",
+    "vite": "^8.0.14"
+  }
+}

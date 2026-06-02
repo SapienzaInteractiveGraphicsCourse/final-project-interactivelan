@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // From world.js, import functions that need testing
 import { createTerrain, placeTrees } from './world.js';
-import { loadTreeModels } from './entities';
+import { loadTreeModels } from './entities.js';
+
 
 
 const scene = new THREE.Scene();
@@ -15,6 +16,11 @@ const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.inner
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setAnimationLoop( animate );
+
+// Let's add shadows to the renderer
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+
 document.body.appendChild( renderer.domElement );
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -23,14 +29,31 @@ controls.dampingFactor = 0.08;
 
 // Some simple light for the scene
 const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(0, 1, 0);
+light.position.set(100, 50, 50);
+
+// We need a big enough shadow map
+light.shadow.camera.near = 0.5;
+light.shadow.camera.far = 2000;
+light.shadow.camera.left = -600;
+light.shadow.camera.right = 600;
+light.shadow.camera.top = 600;
+light.shadow.camera.bottom = -600;
+
+light.castShadow = true;
 scene.add(light);
+
+// To prevent fully black shadows we add a weak ambient light
+const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(ambient);
 
 camera.position.set(0, 200, 300);
 camera.lookAt(0, 0, 0);
 
 window.scene = scene;
 window.camera = camera;
+
+// We want a blue sky!
+scene.background = new THREE.Color("skyblue"); 
 
 // Async setup so we can await tree loading
 async function init() {

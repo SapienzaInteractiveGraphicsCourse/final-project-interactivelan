@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createToonGradientMap, applyCellShading,TOON_GRADIENT_MAP } from './shaders.js';
 
 
 
@@ -18,8 +19,10 @@ export function createTerrain(size, segments, frequency, amplitude) {
     // A temporary dark green color for our material.
     // I may switch to toon Materials down the line, very provisional code right now.
     // Using wireframe for debugging
-    const material = new THREE.MeshBasicMaterial({ color: "darkgreen", wireframe: false, vertexColors: true });
+    const material = new THREE.MeshLambertMaterial({ color: "green", wireframe: false, flatShading: true});
     const terrain  = new THREE.Mesh(geometry, material);
+    terrain.receiveShadow = true;  
+    terrain.castShadow = false;
 
     // By default it is created upright, we need to rotate it to have a terrain and not a wall.
     geometry.rotateX(-Math.PI / 2);
@@ -31,16 +34,6 @@ export function createTerrain(size, segments, frequency, amplitude) {
     // Total number of vertices on our plane; hopefully it should be equal to segments*segments..
     const count = geometry.attributes.position.count;
 
-    // We will color the ground approriately now: single color (brown), later we will add grass.
-    // Initialize vertex colors with brown as we said
-    const colors = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-        colors[i * 3]     = 0.6;  // R
-        colors[i * 3 + 1] = 0.4;  // G
-        colors[i * 3 + 2] = 0.2;  // B
-    }
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
     // Assign Y values corresponding to plane's vertices from our noise map
     for (let i=0; i<count; i++){
         // We are reading a vector of points: let's get the position of each one
@@ -49,6 +42,11 @@ export function createTerrain(size, segments, frequency, amplitude) {
         let z = geometry.attributes.position.getZ(i);
         let y = noise(x*frequency, z*frequency)*amplitude;
 
+        // Quantization of the terrain's heights:
+        // There will just be 8 possible heights of terrain, it will make npc movement easier later on
+        const levels = 8;
+        y = Math.round(y * levels) / levels;
+        
         // Assign new y value we got from our noise map.
         geometry.attributes.position.setY(i, y);
     }
@@ -63,6 +61,9 @@ export function createTerrain(size, segments, frequency, amplitude) {
 
 // Let's place some trees on the map, otherwise it will be too empty!
 export async function placeTrees(scene, terrain, treeModels, treeScale, threshold) {
+
+    const gradientMap = createToonGradientMap();
+
     const clusterNoise = createNoise2D();
     const detailNoise  = createNoise2D();
 
@@ -86,7 +87,8 @@ export async function placeTrees(scene, terrain, treeModels, treeScale, threshol
 
         // We want even more green around trees, so that the remaining ground will look like paths
         // Color the ground green where trees are placed
-        colors.setXYZ(i, 0.08, 0.2, 0.04);
+        // colors.setXYZ(i, 0.08, 0.2, 0.04);
+
         // Small random jitter so trees don't sit exactly on grid points
         // Do we need really need it?
         let jitterX = (Math.random() - 0.5) * 10;
@@ -95,15 +97,17 @@ export async function placeTrees(scene, terrain, treeModels, treeScale, threshol
         // Select a random tree model from the three available
         let model = treeModels[Math.floor(Math.random() * treeModels.length)];
         let tree  = model.clone();
+        // We want trees to cast shadows
+        tree.castShadow = true;
+
+        // We already computed TOON_GRADIENT_MAP
+        applyCellShading(tree, TOON_GRADIENT_MAP);
 
         tree.position.set(x + jitterX, y, z + jitterZ);
         tree.rotation.y = Math.random() * Math.PI * 2;
         tree.scale.setScalar(treeScale);
 
-
         scene.add(tree);
     }
 
-    // Notify Three.js that vertex colors have been updated
-    colors.needsUpdate = true;
 }

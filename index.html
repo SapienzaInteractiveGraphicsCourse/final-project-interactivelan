@@ -2,14 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>StaticDefense</title>
+  <title>StaticDefense — Debug</title>
   <style>
-    * { margin: 0; padding: 0; }
-    body { overflow: hidden; background: #000; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+    canvas { display: block; }
+    .menu { display: flex; flex-direction: column; gap: 12px; }
+    a { color: #fff; font-family: monospace; font-size: 18px; text-decoration: none; padding: 10px 24px; border: 1px solid #444; }
+    a:hover { background: #333; }
   </style>
 </head>
 <body>
-  <!-- We are debugging now, so using debug.js -->
-  <script type="module" src="/src/debug.js"></script>
+  <div class="menu">
+    <a href="/debug.html?scene=terrain">Terrain</a>
+  </div>
+  <script type="module" src="/src/debug/debug_index.js"></script>
 </body>
 </html>

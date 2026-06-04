@@ -4,6 +4,7 @@ import { loadModel } from '../entities.js';
 import { Launcher } from '../launcher.js'
 import { InputHandler } from '../input.js';
 
+
 // Some code borrowed from debug_terrain.js
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -95,7 +96,7 @@ function animate() {
     lastTime    = now;
 
     // Wait for launcher to be properly loaded and ready
-    if (launcher) launcher.update(input, delta);
+    if (launcher) launcher.update(input, delta, scene);
     
     controls.update();
     renderer.render(scene, camera);

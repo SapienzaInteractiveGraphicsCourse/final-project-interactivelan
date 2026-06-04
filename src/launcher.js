@@ -12,6 +12,8 @@ export const LauncherState = Object.freeze({
     READY:      'READY',
 });
 
+
+// Our class handling the main part of the game: the Launcher
 export class Launcher {
     constructor(model) {
 
@@ -47,6 +49,11 @@ export class Launcher {
         // Our Tube's mesh
         this.tubeMesh = null;
 
+        // Physics data for the flying tube { mesh, velocity }
+        this.looseTubePhysics = null;
+        // The actual mesh sitting in the scene after landing
+        this.looseTubeMesh    = null;
+
         // Wrap model in a group so we control its transform via class properties
         this.group = new THREE.Group();
         this.group.add(model);
@@ -79,8 +86,8 @@ export class Launcher {
 
         // Store tube rest position before any animation, to use for our reload later
         // Must be after traverse so tubeMesh is assigned
-        this.tubeRestPosition  = this.missileBone ? this.missileBone.position.clone() : new THREE.Vector3();
-        this.reloadStartPos    = new THREE.Vector3();
+        this.tubeRestPosition = this.missileBone ? this.missileBone.position.clone() : new THREE.Vector3();
+        this.reloadStartPos   = new THREE.Vector3();
     }
 
     // Update our launcher's position.
@@ -110,24 +117,25 @@ export class Launcher {
 
         // Reload when R is pressed
         if (input.isDown('KeyR')) {
-            this.reload();
+            this.reload(scene);
         }
 
         // Simulate loose tube physics
         // Stop when it hits the ground
-        if (this.looseTube) {
+        if (this.looseTubePhysics) {
             // Vertical velocity
-            this.looseTube.velocity.y -= 12 * delta;
-            this.looseTube.mesh.position.addScaledVector(this.looseTube.velocity, delta);
+            this.looseTubePhysics.velocity.y -= 12 * delta;
+            this.looseTubePhysics.mesh.position.addScaledVector(this.looseTubePhysics.velocity, delta);
 
             // Get bottom of mesh, not center
             // Another bounding box, yay
-            const box = new THREE.Box3().setFromObject(this.looseTube.mesh);
+            const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
             // Stop when on the ground
             if (box.min.y <= 0) {
-                this.looseTube.mesh.position.y += -box.min.y;
-                this.looseTube.velocity.set(0, 0, 0);
-                this.looseTube = null;
+                this.looseTubePhysics.mesh.position.y += -box.min.y;
+                this.looseTubePhysics.velocity.set(0, 0, 0);
+                // Physics done — clear physics data but keep mesh reference for cleanup on reload
+                this.looseTubePhysics = null;
 
                 // This is temporary: after the tube is tossed we enter POST_FIRE State.
                 // It will be changed later
@@ -156,7 +164,7 @@ export class Launcher {
     addToScene(scene) {
         scene.add(this.group);
         // Calculate bounding box, use it's lowest positon as base to place it
-        const box    = new THREE.Box3().setFromObject(this.group);
+        const box = new THREE.Box3().setFromObject(this.group);
         this.group.position.y = -box.min.y;
     }
 
@@ -165,12 +173,18 @@ export class Launcher {
         // If the launcher isn't ready to fire, return
         if (this.state != LauncherState.READY) return;
         // TODO: Add code for handling the missile and everything
-        this.state = LauncherState.FIRED;
-        this.looseTube = this.tossTube(scene);
+        this.state            = LauncherState.FIRED;
+        this.looseTubePhysics = this.tossTube(scene);
     }
 
-    reload() {
+    reload(scene) {
         if (this.state != LauncherState.POST_FIRE) return;
+
+        // Remove the old tube mesh from the scene before reloading
+        if (this.looseTubeMesh) {
+            scene.remove(this.looseTubeMesh);
+            this.looseTubeMesh = null;
+        }
 
         // Enter reload state
         this.state       = LauncherState.RELOADING;
@@ -185,8 +199,6 @@ export class Launcher {
     // After firing, the tube is tossed to the side (like the real life counterpart)
     tossTube(scene) {
         // Make sure we have the mesh and bone
-        console.log('tossTube called, tubeMesh:', this.tubeMesh, 'missileBone:', this.missileBone);
-
         if (!this.tubeMesh || !this.missileBone) return;
 
         // Get tube's current world position and rotation
@@ -198,22 +210,22 @@ export class Launcher {
         // Clone the tube mesh as a loose object
         // We throw away a clone, and keep the original hidden
         // Assign the original's world position and rotation to the clone
-        const loose = new THREE.Mesh(
+        this.looseTubeMesh = new THREE.Mesh(
             this.tubeMesh.geometry.clone(),
             this.tubeMesh.material
         );
-        loose.position.copy(worldPos);
-        loose.quaternion.copy(worldQuat);
+        this.looseTubeMesh.position.copy(worldPos);
+        this.looseTubeMesh.quaternion.copy(worldQuat);
 
         // Add loose tube to scene so it's visible
-        scene.add(loose);
+        scene.add(this.looseTubeMesh);
 
         // Hide original tube on the model
         this.tubeMesh.visible = false;
 
         // Return loose tube data so the caller can simulate it
         return {
-            mesh:     loose,
+            mesh:     this.looseTubeMesh,
             velocity: new THREE.Vector3(
                 -2.5,   // slight sideways, negative = to the left
                 2,      // upward

@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel } from '../entities.js';
 import { Launcher } from '../launcher.js'
 import { InputHandler } from '../input.js';
+import { applyCellShading, TOON_GRADIENT_MAP } from '../shaders.js';
 
 
 // Some code borrowed from debug_terrain.js
@@ -70,6 +71,7 @@ const input  = new InputHandler();
 async function init() {
     // Load the ATGM launcher model
     const model    = await loadModel('/assets/models/launcher.glb');
+    applyCellShading(model, TOON_GRADIENT_MAP);
     launcher = new Launcher(model);
     launcher.addToScene(scene);
 

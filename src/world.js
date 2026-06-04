@@ -107,7 +107,7 @@ export async function placeTrees(scene, terrain, terrainSize, treeModels, treeSc
         tree.castShadow = true;
 
         // We already computed TOON_GRADIENT_MAP
-        applyCellShading(tree, TOON_GRADIENT_MAP);
+        applyTreeCellShading(tree, TOON_GRADIENT_MAP);
 
         // tree.position.set(x + jitterX, y, z + jitterZ);
 

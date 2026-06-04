@@ -66,7 +66,7 @@ export function createTerrain(size, segments, frequency, amplitude) {
 
 
 // Let's place some trees on the map, otherwise it will be too empty!
-export async function placeTrees(scene, terrain, treeModels, treeScale, threshold, navigationMap) {
+export async function placeTrees(scene, terrain, terrainSize, treeModels, treeScale, threshold, navigationMap) {
 
     const gradientMap = createToonGradientMap();
 
@@ -109,7 +109,13 @@ export async function placeTrees(scene, terrain, treeModels, treeScale, threshol
         // We already computed TOON_GRADIENT_MAP
         applyCellShading(tree, TOON_GRADIENT_MAP);
 
-        tree.position.set(x + jitterX, y, z + jitterZ);
+        // tree.position.set(x + jitterX, y, z + jitterZ);
+
+        // Make sure we aren't placing trees into the void after applying jitter: let's clamp
+        let treeX = Math.max(-terrainSize/2, Math.min(terrainSize/2, x + jitterX));
+        let treeZ = Math.max(-terrainSize/2, Math.min(terrainSize/2, z + jitterZ));
+
+        tree.position.set(treeX, y, treeZ)
         tree.rotation.y = Math.random() * Math.PI * 2;
 
         // Let's have some variation in size of trees

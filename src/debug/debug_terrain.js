@@ -52,7 +52,6 @@ camera.lookAt(0, 0, 0);
 window.scene = scene;
 window.camera = camera;
 
-
 // We want auto resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -86,7 +85,9 @@ scene.background = new THREE.Color("skyblue");
 // Async setup so we can await tree loading
 async function init() {
     // We create our basic terrain
-    const resultTerrain = createTerrain(500, 120, 0.005, 15);
+    const terrainSize = 500;
+    const terrainSegments = 120;
+    const resultTerrain = createTerrain(terrainSize, terrainSegments, 0.005, 15);
     const terrain = resultTerrain.terrain;
     navMap = resultTerrain.navMap;  // assigns to outer let navMap, not a new local variable
 
@@ -96,7 +97,7 @@ async function init() {
     // We load the trees'models
     const treeModels = await loadTreeModels();
     // Place models on our terrain!
-    placeTrees(scene, terrain, treeModels, 2, 0.6, navMap);
+    placeTrees(scene, terrain, terrainSize, treeModels, 2, 0.6, navMap);
     // Visualize our navMap
     // navMap.visualize(scene);
 

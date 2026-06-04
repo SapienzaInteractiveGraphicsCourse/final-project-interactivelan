@@ -9,6 +9,6 @@ if (scene) {
     document.body.innerHTML = '';
 
     if (scene === 'terrain')  import('./debug_terrain.js');
-    // if (scene === 'launcher') import('./launcher.js');
+    if (scene === 'launcher') import('./debug_launcher.js');
     // if (scene === 'targets')  import('./targets.js');
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createToonGradientMap, applyCellShading,TOON_GRADIENT_MAP } from './shaders.js';
+import { createToonGradientMap, applyCellShading, applyTreeCellShading, TOON_GRADIENT_MAP } from './shaders.js';
 import { NavigationMap } from './navigation.js';
 
 

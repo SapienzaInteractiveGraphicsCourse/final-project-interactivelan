@@ -2,8 +2,52 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel }     from '../entities.js';
 import { InputHandler }  from '../input.js';
-import { applyCellShading, TOON_GRADIENT_MAP } from '../shaders.js';
+import { Tank }          from '../tank.js';
 
+// Class to help debug tank hitboxes and such
+class TankDebugger {
+    constructor(tank, scene, camera, renderer, input) {
+        this.tank     = tank;
+        this.scene    = scene;
+        this.camera   = camera;
+        this.renderer = renderer;
+        this.input    = input;
+
+        this._setupHitTest();
+    }
+
+    // Click on tank to test hit detection
+    _setupHitTest() {
+        const raycaster = new THREE.Raycaster();
+        const mouse     = new THREE.Vector2();
+
+        this.renderer.domElement.addEventListener('click', (e) => {
+            mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            // Shoot ray from camera to click position
+            raycaster.setFromCamera(mouse, this.camera);
+
+            // First check if we clicked on the tank at all
+            const hits = raycaster.intersectObject(this.tank.group, true);
+            if (hits.length === 0) return;
+
+            // Use the original camera ray against proxy meshes
+            const hit = this.tank.isHitBy(raycaster.ray.origin, raycaster.ray.direction);
+            console.log(`Click: ${hit ? 'HIT' : 'MISS'}`);
+
+            // Visualize hit point with a small sphere
+            const sphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1),
+                new THREE.MeshBasicMaterial({ color: hit ? 0xff0000 : 0x00ff00 })
+            );
+            sphere.position.copy(hits[0].point);
+            this.scene.add(sphere);
+            setTimeout(() => this.scene.remove(sphere), 2000);
+        });
+    }
+
+}
 
 // Some code borrowed from debug_launcher.js
 const scene  = new THREE.Scene();
@@ -58,20 +102,8 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Bone references — set after model loads
-let hullBone   = null;
-let turretBone = null;
-let gunBone    = null;
-
-// Turret and gun aim state
-let yaw   = 0;
-let pitch = 0;
-
-// Harcoded limits for our tank turret's movement
-const YAW_SPEED   = 1.0;
-const PITCH_SPEED = 0.8;
-const PITCH_MIN   = -0.1;
-const PITCH_MAX   = 0.4;
+// Declare tank so it's accessible outside init
+let tank;
 
 // Performance monitor
 let lastTime = performance.now();
@@ -79,30 +111,16 @@ let lastTime = performance.now();
 const input  = new InputHandler();
 
 async function init() {
-    // Load the tank model
+    // Load the tank model and hand it to the Tank class
     const model = await loadModel('/assets/models/tank.glb');
-    applyCellShading(model, TOON_GRADIENT_MAP);
+    tank = new Tank(model);
+    tank.addToScene(scene);
 
-    // Make sure the tank is touching the ground
-    const box = new THREE.Box3().setFromObject(model);
-    model.position.y = -box.min.y;
-    scene.add(model);
-
-    // Search for expected bones in loaded model
-    // Our model should have:
-    // Hull
-    //  \-> Turret
-    //    \-> Gun
-    model.traverse((obj) => {
-        if (obj.isBone) {
-            console.log('Bone found:', obj.name);
-            if (obj.name === 'Hull')   hullBone   = obj;
-            if (obj.name === 'Turret') turretBone = obj;
-            if (obj.name === 'Gun')    gunBone    = obj;
-        }
-    });
+    // Start debugger
+    const tankDebugger = new TankDebugger(tank, scene, camera, renderer, input);
 
     // Autoposition camera according to model's bounds, so it's always framed correctly
+    const box    = new THREE.Box3().setFromObject(tank.group);
     const center = new THREE.Vector3();
     const size   = new THREE.Vector3();
     box.getCenter(center);
@@ -122,17 +140,22 @@ function animate() {
     const delta = (now - lastTime) / 1000;
     lastTime    = now;
 
-    // Arrow keys rotate turret left/right, up/down elevates the gun
-    if (turretBone) {
-        if (input.isDown('ArrowLeft'))  yaw += YAW_SPEED * delta;
-        if (input.isDown('ArrowRight')) yaw -= YAW_SPEED * delta;
-        turretBone.rotation.y = yaw;
-    }
+    if (tank) {
+        // Arrow keys rotate turret left/right, up/down elevates the gun
+        if (tank.turretBone) {
+            if (input.isDown('ArrowLeft'))  tank.turretBone.rotation.y += 1.0 * delta;
+            if (input.isDown('ArrowRight')) tank.turretBone.rotation.y -= 1.0 * delta;
+        }
 
-    if (gunBone) {
-        if (input.isDown('ArrowUp'))   pitch = Math.max(-PITCH_MAX, pitch - PITCH_SPEED * delta);
-        if (input.isDown('ArrowDown')) pitch = Math.min(-PITCH_MIN, pitch + PITCH_SPEED * delta);
-        gunBone.rotation.z = pitch;
+        if (tank.gunBone) {
+            if (input.isDown('ArrowUp'))   tank.gunBone.rotation.z = Math.max(-0.1, tank.gunBone.rotation.z - 0.8 * delta);
+            if (input.isDown('ArrowDown')) tank.gunBone.rotation.z = Math.min(0.4,  tank.gunBone.rotation.z + 0.8 * delta);
+        }
+
+        // Simulate tank being hit
+        if (input.isDown('KeyH')) tank.hit();
+
+        tank.update(delta, scene);
     }
 
     controls.update();

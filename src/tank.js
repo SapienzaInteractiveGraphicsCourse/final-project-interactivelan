@@ -41,9 +41,17 @@ export class Tank {
         this.turretBone = null;
         this.gunBone    = null;
 
+        // Our references to the model's meshes
+        this.hullMesh   = null;
+        this.turretMesh = null;
+        this.gunMesh    = null;
+
         // Wrap model in a group so we control its transform via class properties
         this.group = new THREE.Group();
         this.group.add(model);
+
+        // Raycaster to check for collisions
+        this._raycaster = new THREE.Raycaster();
 
         // Make sure the tank is touching the ground
         const box = new THREE.Box3().setFromObject(model);
@@ -64,6 +72,12 @@ export class Tank {
                 if (obj.name === 'Turret') this.turretBone = obj;
                 if (obj.name === 'Gun')    this.gunBone    = obj;
             }
+            // In traverse, store mesh references
+            if (obj.isMesh) {
+                if (obj.name === 'HullMesh')   this.hullMesh   = obj;
+                if (obj.name === 'TurretMesh') this.turretMesh = obj;
+                if (obj.name === 'GunMesh')    this.gunMesh    = obj;
+            }
         });
     }
 
@@ -73,9 +87,14 @@ export class Tank {
         // Sit on the ground after adding to scene
         const box = new THREE.Box3().setFromObject(this.group);
         this.group.position.y = -box.min.y;
+
+        // Force world matrix update before computing proxy positions
+        this.group.updateMatrixWorld(true);
+        // Now bones have correct world matrices
+        this._addProxyMeshes(scene);
     }
 
-    // Aim turret and gun toward a world position
+    // Aim turret and gun toward a world position, IK
     // Called by AI or debug code
     aimAt(worldTarget) {
         if (this.state !== TankState.ALIVE) return;
@@ -123,14 +142,53 @@ export class Tank {
         return TankState.COOKOFF;
     }
 
+    // Generate proxyMeshes for our model's hit detection, since this seems to be the correct approach from what I read online
+    // This part was a headache
+    _addProxyMeshes(scene) {
+        const invisible = new THREE.MeshBasicMaterial({ visible: false });
+
+        const _setupProxy = (mesh, bone) => {
+            const box    = new THREE.Box3().setFromObject(mesh);
+            const size   = new THREE.Vector3();
+            const center = new THREE.Vector3();
+            box.getSize(size);
+            box.getCenter(center);
+
+            // Create proxy at correct world position first
+            const proxy = new THREE.Mesh(
+                new THREE.BoxGeometry(size.x, size.y, size.z),
+                invisible
+            );
+            proxy.position.copy(center);
+            scene.add(proxy);
+
+            // Built-in attach() preserves world position when reparenting to bone
+            bone.attach(proxy);
+            return proxy;
+        };
+
+        this.hullProxy   = _setupProxy(this.hullMesh,   this.hullBone);
+        this.turretProxy = _setupProxy(this.turretMesh, this.turretBone);
+        this.gunProxy    = _setupProxy(this.gunMesh,    this.gunBone);
+    }
+
+    // Using raycast to check collision
+    isHitBy(rayOrigin, rayDirection) {
+        this._raycaster.set(rayOrigin, rayDirection);
+        const hits = this._raycaster.intersectObject(this.group, true);
+        return hits.length > 0;
+    }
+
     // Handles state machine and transform sync
     update(delta, scene) {
         // Sync group transform from class properties
         this.group.position.copy(this.position);
         this.group.rotation.copy(this.rotation);
         this.group.scale.copy(this.scale);
+        this.group.updateMatrixWorld(true);
 
-        this.stateTimer += delta;
+        // Only increment timer when tank is not dead
+        if (this.state !== TankState.DEAD) this.stateTimer += delta;
 
         switch (this.state) {
 
@@ -156,7 +214,7 @@ export class Tank {
                 break;
 
             case TankState.DEAD:
-                // Static wreck — nothing to update
+                // Tank is destroyed, nothing to do aside changing colors to something that makes it look charred
                 break;
         }
     }

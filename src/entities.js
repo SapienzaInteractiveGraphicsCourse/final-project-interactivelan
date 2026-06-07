@@ -15,8 +15,8 @@ export function loadModel(path) {
 export async function loadTreeModels() {
     // Promise.all should load all models in parallel, for what it's worth (they are less than 400kb total lowpoly models)
     return Promise.all([
-        loadModel('/assets/models/tree_a.glb'),
-        loadModel('/assets/models/tree_b.glb'),
-        loadModel('/assets/models/tree_c.glb'),
+        loadModel(`${import.meta.env.BASE_URL}models/tree_a.glb`),
+        loadModel(`${import.meta.env.BASE_URL}models/tree_b.glb`),
+        loadModel(`${import.meta.env.BASE_URL}models/tree_c.glb`)
     ]);
 }

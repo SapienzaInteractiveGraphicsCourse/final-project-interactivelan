@@ -117,7 +117,7 @@ export class Launcher {
     async initUI() {
         try {
             // Load out SVG overlay (sight), in aync modality
-            const response = await fetch('/assets/ui/crosshair.svg');
+            const response = await fetch(`${import.meta.env.BASE_URL}ui/crosshair.svg`);
             const svgData  = await response.text();
 
             // Overlay the loaded SVG to our page

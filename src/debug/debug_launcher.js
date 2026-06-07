@@ -75,7 +75,7 @@ const input  = new InputHandler();
 
 async function init() {
     // Load the ATGM launcher model
-    const model = await loadModel('/assets/models/launcher.glb');
+    const model = await loadModel(`${import.meta.env.BASE_URL}models/launcher.glb`);
     applyCellShading(model);
     launcher = new Launcher(model);
     launcher.addToScene(scene);
@@ -94,7 +94,7 @@ async function init() {
     // Orbit around model center, not world origin
     controls.target.copy(center);
 
-    const model_tank = await loadModel('/assets/models/tank.glb');
+    const model_tank = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
     tank = new Tank(model_tank);
     tank.addToScene(scene, new THREE.Vector3(100, 0, 5));
     // Add tank to list of hittable tanks of our launcher

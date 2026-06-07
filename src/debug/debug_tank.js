@@ -112,7 +112,7 @@ const input  = new InputHandler();
 
 async function init() {
     // Load the tank model and hand it to the Tank class
-    const model = await loadModel('/assets/models/tank.glb');
+    const model = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
     tank = new Tank(model);
     tank.addToScene(scene, new THREE.Vector3(0,0,0));
 

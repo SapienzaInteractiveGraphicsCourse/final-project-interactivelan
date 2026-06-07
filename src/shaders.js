@@ -1,7 +1,4 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
-import { OutlinePass }    from 'three/addons/postprocessing/OutlinePass.js';
 
 // Let's generate our gradient map once, much more efficient.
 // export const TOON_GRADIENT_MAP = createToonGradientMap();
@@ -73,29 +70,4 @@ export function applyTreeCellShading(object) {
         child.castShadow    = true;
         child.receiveShadow = true;
     });
-}
-
-// Currently unused
-// Creates a post-processing composer with an outline pass
-export function createOutlineComposer(renderer, scene, camera) {
-    const composer = new EffectComposer(renderer);
-
-    // Standard render pass to draw the scene normally first
-    composer.addPass(new RenderPass(scene, camera));
-
-    // Outline pass that draws black outlines around selected objects
-    const outlinePass = new OutlinePass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        scene,
-        camera
-    );
-    outlinePass.edgeStrength  = 3;
-    outlinePass.edgeThickness = 1;
-    outlinePass.edgeGlow      = 0;
-    outlinePass.visibleEdgeColor.set(0x000000);
-    outlinePass.hiddenEdgeColor.set(0x000000);
-
-    composer.addPass(outlinePass);
-
-    return { composer, outlinePass };
 }

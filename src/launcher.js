@@ -21,10 +21,17 @@ export class Launcher {
         // Launcher starts as ready to fire
         this.state = LauncherState.READY;
 
+        // Which camera are we using
+
         // Transform properties
         this.position = new THREE.Vector3(0, 0, 0);
         this.rotation = new THREE.Euler(0, 0, 0);
         this.scale    = new THREE.Vector3(1, 1, 1);
+
+        // Cameras references and state
+        this.mainCamera  = null;
+        this.activeCam   = null;
+        this.wasAimPressed = false;
 
         // Rotation speeds and pitch limits
         // Hardcoded for now, we'll se in the future
@@ -45,6 +52,7 @@ export class Launcher {
         this.middleBone   = null;
         this.launcherBone = null;
         this.missileBone  = null;
+        this.sightBone    = null; 
 
         // Our Tube's mesh
         this.tubeMesh = null;
@@ -76,6 +84,7 @@ export class Launcher {
                 if (obj.name === 'Middle')   this.middleBone   = obj;
                 if (obj.name === 'Launcher') this.launcherBone = obj;
                 if (obj.name === 'Tube')     this.missileBone  = obj;
+                if (obj.name === 'Sight')    this.sightBone    = obj;
             }
 
             // Assign the mesh of our tube if it has the correct name to the variable
@@ -88,6 +97,96 @@ export class Launcher {
         // Must be after traverse so tubeMesh is assigned
         this.tubeRestPosition = this.missileBone ? this.missileBone.position.clone() : new THREE.Vector3();
         this.reloadStartPos   = new THREE.Vector3();
+
+        // UI References: we want to load our Overlay from the ATGM camera crosshair
+        this.crosshairElement = null;
+        this.isAiming         = false;
+
+        // Initialize the UI immediately
+        this.initUI();
+    }
+
+    // Initialize our UI overlay
+    async initUI() {
+        try {
+            // Load out SVG overlay (sight), in aync modality
+            const response = await fetch('/assets/ui/crosshair.svg');
+            const svgData  = await response.text();
+
+            // Overlay the loaded SVG to our page
+            this.crosshairElement = document.createElement('div');
+            this.crosshairElement.id = 'crosshair-ui';
+            this.crosshairElement.style.cssText = `
+                position: fixed;
+                top: 0; left: 0;
+                width: 100vw; height: 100vh;
+                pointer-events: none;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                visibility: hidden;
+                z-index: 100;
+            `;
+            this.crosshairElement.innerHTML = svgData;
+            document.body.appendChild(this.crosshairElement);
+
+            if (this.isAiming) this.crosshairElement.style.visibility = 'visible';
+            // Let it be visible if we are in scoped mode
+        } catch (error) {
+            console.error('Failed to load crosshair:', error);
+        }
+    }
+
+    // We set the aiming state and add overlay
+    enterAimMode() {
+        this.isAiming = true;
+        if (this.crosshairElement) {
+            this.crosshairElement.style.visibility = 'visible';
+        }
+    }
+
+    // We set the aiming state and remove overlay
+    exitAimMode() {
+        this.isAiming = false;
+        if (this.crosshairElement) {
+            this.crosshairElement.style.visibility = 'hidden';
+        }
+    }
+
+    // Switch camera between main and launcher
+    toggleCamera(mainCamera) {
+        if (!this.sightCamera) return mainCamera;
+
+        const switchingToSight = this.activeCam === mainCamera;
+
+        if (switchingToSight) {
+            this.sightCamera.aspect = window.innerWidth / window.innerHeight;
+            this.sightCamera.updateProjectionMatrix();
+            this.enterAimMode();
+            return this.sightCamera;
+        } else {
+            this.exitAimMode();
+            return mainCamera;
+        }
+    }
+
+    // Self explainatory
+    setMainCamera(camera) {
+        this.mainCamera = camera;
+        this.activeCam  = camera;
+    }
+
+    // Return active camera
+    get activeCamera() {
+        return this.activeCam;
+    }
+
+    // If we resize window while scoped in, make sure the camera isn't stretched or squished
+    onResize() {
+        if (this.sightCamera) {
+            this.sightCamera.aspect = window.innerWidth / window.innerHeight;
+            this.sightCamera.updateProjectionMatrix();
+        }
     }
 
     // Update our launcher's position.
@@ -97,6 +196,13 @@ export class Launcher {
         this.group.rotation.copy(this.rotation);
         this.group.scale.copy(this.scale);
 
+        // If V is pressed we go into aiming mode
+        const vPressed = input.isDown('KeyV');
+        if (vPressed && !this.wasAimPressed && this.mainCamera) {
+            this.activeCam = this.toggleCamera(this.mainCamera);
+        }
+        this.wasAimPressed = vPressed;
+
         // Bone aiming
         if (this.middleBone) {
             if (input.isDown('ArrowLeft'))  this.yaw += this.YAW_SPEED * delta;
@@ -104,9 +210,10 @@ export class Launcher {
             this.middleBone.rotation.y = this.yaw;
         }
 
+
         if (this.launcherBone) {
-            if (input.isDown('ArrowUp'))   this.pitch = Math.max(this.PITCH_MIN, this.pitch - this.PITCH_SPEED * delta);
-            if (input.isDown('ArrowDown')) this.pitch = Math.min(this.PITCH_MAX, this.pitch + this.PITCH_SPEED * delta);
+            if (input.isDown('ArrowUp'))   this.pitch = Math.min(this.PITCH_MAX, this.pitch + this.PITCH_SPEED * delta);
+            if (input.isDown('ArrowDown')) this.pitch = Math.max(this.PITCH_MIN, this.pitch - this.PITCH_SPEED * delta);
             this.launcherBone.rotation.x = this.pitch;
         }
 
@@ -119,6 +226,7 @@ export class Launcher {
         if (input.isDown('KeyR')) {
             this.reload(scene);
         }
+
 
         // Simulate loose tube physics
         // Stop when it hits the ground
@@ -157,6 +265,7 @@ export class Launcher {
                 this.reloadTimer = 0;
                 this.state       = LauncherState.READY;
             }
+            
         }
     }
 
@@ -166,6 +275,25 @@ export class Launcher {
         // Calculate bounding box, use it's lowest positon as base to place it
         const box = new THREE.Box3().setFromObject(this.group);
         this.group.position.y = -box.min.y;
+
+        // Sight camera is parented to Launcher bone, moves with it
+        // It has a small FOV since it's supposed to be a telescopic sight
+        if (this.sightBone) {
+            this.sightCamera = new THREE.PerspectiveCamera(
+                15,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            // Position at the tip of the Sight bone, pointing forward
+            this.sightCamera.position.set(0, 0, 0);
+            // Let's make sure the camera is pointing the correct way
+            // Trial and error
+            this.sightCamera.rotation.set(Math.PI / 2, 0, 0);
+            // Add to scene first, then add it to bone hierarchy
+            scene.add(this.sightCamera);
+            this.sightBone.add(this.sightCamera);
+        }
     }
 
     // Trigger the tube toss

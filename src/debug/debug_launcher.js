@@ -1,24 +1,26 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel } from '../entities.js';
-import { Launcher } from '../launcher.js'
+import { Launcher } from '../launcher.js';
 import { InputHandler } from '../input.js';
 import { applyCellShading, TOON_GRADIENT_MAP } from '../shaders.js';
 
+// temporary to test the new camera
+import { Tank }          from '../tank.js';
 
 // Some code borrowed from debug_terrain.js
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer();
-renderer.setSize( window.innerWidth, window.innerHeight );
-renderer.setAnimationLoop( animate );
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setAnimationLoop(animate);
 
 // Let's add shadows to the renderer
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type    = THREE.PCFShadowMap;
 
-document.body.appendChild( renderer.domElement );
+document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -29,11 +31,11 @@ const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(10, 5, 5);
 
 // We need a big enough shadow map
-light.shadow.camera.near = 0.5;
-light.shadow.camera.far = 2000;
-light.shadow.camera.left = -600;
-light.shadow.camera.right = 600;
-light.shadow.camera.top = 600;
+light.shadow.camera.near   = 0.5;
+light.shadow.camera.far    = 2000;
+light.shadow.camera.left   = -600;
+light.shadow.camera.right  = 600;
+light.shadow.camera.top    = 600;
 light.shadow.camera.bottom = -600;
 
 light.castShadow = true;
@@ -49,7 +51,7 @@ scene.add(new THREE.GridHelper(20, 20));
 // We want a blue sky!
 scene.background = new THREE.Color("skyblue");
 
-window.scene = scene;
+window.scene  = scene;
 window.camera = camera;
 
 // We want auto resize
@@ -57,25 +59,26 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (launcher) launcher.onResize();
 });
 
 // Declare launcher so that it's accessible in animate()
 let launcher;
+
 // Performance monitor
 let lastTime = performance.now();
 // Input handler
 const input  = new InputHandler();
 
-
-
 async function init() {
     // Load the ATGM launcher model
-    const model    = await loadModel('/assets/models/launcher.glb');
+    const model = await loadModel('/assets/models/launcher.glb');
     applyCellShading(model, TOON_GRADIENT_MAP);
     launcher = new Launcher(model);
     launcher.addToScene(scene);
+    launcher.setMainCamera(camera);
 
-    // Autoposition camera according to model's  bounds, so it's always framed correctly
+    // Autoposition camera according to model's bounds, so it's always framed correctly
     const box    = new THREE.Box3().setFromObject(model);
     const center = new THREE.Vector3();
     const size   = new THREE.Vector3();
@@ -86,8 +89,11 @@ async function init() {
     camera.position.set(center.x, center.y + maxDim, center.z + maxDim * 2);
     camera.lookAt(center);
     // Orbit around model center, not world origin
-    controls.target.copy(center); 
+    controls.target.copy(center);
 
+    const model_tank = await loadModel('/assets/models/tank.glb');
+    const tank = new Tank(model_tank);
+    tank.addToScene(scene, new THREE.Vector3(10, 0, 5));
 }
 
 init();
@@ -97,9 +103,12 @@ function animate() {
     const delta = (now - lastTime) / 1000;
     lastTime    = now;
 
-    // Wait for launcher to be properly loaded and ready
-    if (launcher) launcher.update(input, delta, scene);
-    
+    if (launcher) {
+        launcher.update(input, delta, scene);
+    }
+
     controls.update();
-    renderer.render(scene, camera);
+
+    // Make sure launcher is defined when animate runs (it gets assigned after init() is ran)
+    renderer.render(scene, launcher?.activeCamera ?? camera);
 }

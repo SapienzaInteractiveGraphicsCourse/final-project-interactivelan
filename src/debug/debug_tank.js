@@ -114,7 +114,7 @@ async function init() {
     // Load the tank model and hand it to the Tank class
     const model = await loadModel('/assets/models/tank.glb');
     tank = new Tank(model);
-    tank.addToScene(scene);
+    tank.addToScene(scene, new THREE.Vector3(0,0,0));
 
     // Start debugger
     const tankDebugger = new TankDebugger(tank, scene, camera, renderer, input);

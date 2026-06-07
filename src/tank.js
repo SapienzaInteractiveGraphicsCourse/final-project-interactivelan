@@ -81,17 +81,22 @@ export class Tank {
         });
     }
 
-    // Add the tank to a scene
-    addToScene(scene) {
+    // Add the tank to a scene at specified position
+    addToScene(scene, position = new THREE.Vector3()) {
         scene.add(this.group);
+
         // Sit on the ground after adding to scene
         const box = new THREE.Box3().setFromObject(this.group);
         this.group.position.y = -box.min.y;
 
+        // Set spawn position, keep the ground-corrected Y
+        this.group.position.x = position.x;
+        this.group.position.z = position.z;
+
         // Force world matrix update before computing proxy positions
         this.group.updateMatrixWorld(true);
         // Now bones have correct world matrices
-        this._addProxyMeshes(scene);
+        this.addProxyMeshes(scene);
     }
 
     // Aim turret and gun toward a world position, IK
@@ -138,13 +143,13 @@ export class Tank {
 
     // Choose a random death type
     // Simplified for now, may expand it later
-    _rollDeathType() {
+    rollDeathType() {
         return TankState.COOKOFF;
     }
 
     // Generate proxyMeshes for our model's hit detection, since this seems to be the correct approach from what I read online
     // This part was a headache
-    _addProxyMeshes(scene) {
+    addProxyMeshes(scene) {
         const invisible = new THREE.MeshBasicMaterial({ visible: false });
 
         const _setupProxy = (mesh, bone) => {
@@ -199,7 +204,7 @@ export class Tank {
             case TankState.HIT:
                 // Short pause before transitioning to death state
                 if (this.stateTimer > 0.3) {
-                    this.state      = this._rollDeathType();
+                    this.state      = this.rollDeathType();
                     this.stateTimer = 0;
                 }
                 break;

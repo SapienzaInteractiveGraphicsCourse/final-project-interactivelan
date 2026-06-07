@@ -24,8 +24,6 @@ export class Launcher {
         // Launcher starts as ready to fire
         this.state = LauncherState.READY;
 
-        // Which camera are we using
-
         // Transform properties
         this.position = new THREE.Vector3(0, 0, 0);
         this.rotation = new THREE.Euler(0, 0, 0);

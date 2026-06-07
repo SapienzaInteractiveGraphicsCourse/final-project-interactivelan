@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createToonGradientMap, applyCellShading, applyTreeCellShading, TOON_GRADIENT_MAP } from './shaders.js';
+import { createToonGradientMap, applyCellShading, applyTreeCellShading } from './shaders.js';
 import { NavigationMap } from './navigation.js';
 
 
@@ -106,8 +106,7 @@ export async function placeTrees(scene, terrain, terrainSize, treeModels, treeSc
         // We want trees to cast shadows
         tree.castShadow = true;
 
-        // We already computed TOON_GRADIENT_MAP
-        applyTreeCellShading(tree, TOON_GRADIENT_MAP);
+        applyTreeCellShading(tree);
 
         // tree.position.set(x + jitterX, y, z + jitterZ);
 

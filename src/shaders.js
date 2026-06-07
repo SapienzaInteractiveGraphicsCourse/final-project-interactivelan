@@ -4,7 +4,7 @@ import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass }    from 'three/addons/postprocessing/OutlinePass.js';
 
 // Let's generate our gradient map once, much more efficient.
-export const TOON_GRADIENT_MAP = createToonGradientMap();
+// export const TOON_GRADIENT_MAP = createToonGradientMap();
 
 // Create gradient map to use for cellshading
 export function createToonGradientMap() {

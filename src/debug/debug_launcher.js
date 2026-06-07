@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel } from '../entities.js';
 import { Launcher } from '../launcher.js';
 import { InputHandler } from '../input.js';
-import { applyCellShading, TOON_GRADIENT_MAP } from '../shaders.js';
+import { applyCellShading } from '../shaders.js';
 
 // temporary to test the new camera
 import { Tank }          from '../tank.js';
@@ -76,7 +76,7 @@ const input  = new InputHandler();
 async function init() {
     // Load the ATGM launcher model
     const model = await loadModel('/assets/models/launcher.glb');
-    applyCellShading(model, TOON_GRADIENT_MAP);
+    applyCellShading(model);
     launcher = new Launcher(model);
     launcher.addToScene(scene);
     launcher.setMainCamera(camera);

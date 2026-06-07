@@ -67,7 +67,7 @@ export class Tank {
         //    \-> Gun
         model.traverse((obj) => {
             if (obj.isBone) {
-                console.log('Bone found:', obj.name);
+                // console.log('Bone found:', obj.name);
                 if (obj.name === 'Hull')   this.hullBone   = obj;
                 if (obj.name === 'Turret') this.turretBone = obj;
                 if (obj.name === 'Gun')    this.gunBone    = obj;

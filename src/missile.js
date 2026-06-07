@@ -4,14 +4,14 @@ import { applyCellShading } from './shaders.js';
 // Constants, will be changed or moved
 const SPEED          = 50;
 const GUIDANCE_FACTOR = 2.5;
-const MAX_TRAIL_POINTS = 400;
+const MAX_TRAIL_POINTS = 800;
+const MAX_RANGE = 450;
 
 // Class to handle missiles fired by our ATGM
 export class Missile {
     // Input: where it's shot from and where it's heading
     constructor(spawnPosition, spawnDirection) {
         // Maximumrange before self detonation
-        this.maxRange = 450;
         this.distanceTravelled = 0;
         this.alive = true;
         this.active = false;
@@ -122,7 +122,7 @@ export class Missile {
             const yIdx = i * 3 + 1;
             
             // Accelerate downward ( magic number may tweak it later)
-            this.trailVelocities[i] -= 4 * delta; 
+            this.trailVelocities[i] -= 0.1 * delta; 
             
             // Move the point's Y coordinate
             this.trailPositions[yIdx] += this.trailVelocities[i] * delta;
@@ -141,7 +141,7 @@ export class Missile {
 
         // Self detonation after max range
         this.distanceTravelled += SPEED * delta;
-        if (this.distanceTravelled > this.maxRange) {
+        if (this.distanceTravelled > MAX_RANGE) {
             this.destroy(scene);
             return true;
         }

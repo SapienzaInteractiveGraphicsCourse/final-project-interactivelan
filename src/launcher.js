@@ -244,6 +244,7 @@ export class Launcher {
             this.looseTubePhysics.velocity.y -= 12 * delta;
             this.looseTubePhysics.mesh.position.addScaledVector(this.looseTubePhysics.velocity, delta);
 
+
             // Get bottom of mesh, not center
             const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
             
@@ -330,11 +331,17 @@ export class Launcher {
             scene.add(this.sightCamera);
             this.sightBone.add(this.sightCamera);
         }
+
+        // Permanent marker to read tube world transform reliably
+        // Hopefully will fix our tube toss
+        this.tubeMarker = new THREE.Object3D();
+        scene.add(this.tubeMarker);
+        this.missileBone.attach(this.tubeMarker);
     }
 
     // We want to know where the player is aiming:
     // A ray will be 'shot' from the center of the launcher's camera at exactly 1000 units distance
-    // This is to prevent weird UTurns or manouvers impossible to real ATGMS
+    // This is to prevent weird UTurns or manouvers impossible to real 
     getSightTarget() {
             if (!this.sightCamera) return null;
 
@@ -392,14 +399,13 @@ export class Launcher {
 
     // After firing, the tube is tossed to the side (like the real life counterpart)
     tossTube(scene) {
-        // Make sure we have the mesh and bone
-        if (!this.tubeMesh || !this.missileBone) return;
+        if (!this.tubeMesh || !this.tubeMarker) return;
 
-        // Get tube's current world position and rotation
+        // Read world transform from marker — guaranteed accurate
         const worldPos  = new THREE.Vector3();
         const worldQuat = new THREE.Quaternion();
-        this.tubeMesh.getWorldPosition(worldPos);
-        this.tubeMesh.getWorldQuaternion(worldQuat);
+        this.tubeMarker.getWorldPosition(worldPos);
+        this.tubeMarker.getWorldQuaternion(worldQuat);
 
         // Clone the tube mesh as a loose object
         // We throw away a clone, and keep the original hidden
@@ -411,20 +417,18 @@ export class Launcher {
         this.looseTubeMesh.position.copy(worldPos);
         this.looseTubeMesh.quaternion.copy(worldQuat);
 
-        // Add loose tube to scene so it's visible
         scene.add(this.looseTubeMesh);
-
-        // Hide original tube on the model
         this.tubeMesh.visible = false;
 
-        // Return loose tube data so the caller can simulate it
+        // Toss direction relative to launcher's current rotation
+        const localVelocity = new THREE.Vector3(-2.5, 2, 0);
+        const worldVelocity = localVelocity.applyQuaternion(
+            this.middleBone.getWorldQuaternion(new THREE.Quaternion())
+        );
+
         return {
             mesh:     this.looseTubeMesh,
-            velocity: new THREE.Vector3(
-                -2.5,   // slight sideways, negative = to the left
-                2,      // upward
-                0       // backward
-            ),
+            velocity: worldVelocity,
         };
     }
 }

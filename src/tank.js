@@ -139,6 +139,7 @@ export class Tank {
         if (this.state !== TankState.ALIVE) return;
         this.state      = TankState.HIT;
         this.stateTimer = 0;
+
     }
 
     // Choose a random death type
@@ -152,7 +153,7 @@ export class Tank {
     addProxyMeshes(scene) {
         const invisible = new THREE.MeshBasicMaterial({ visible: false });
 
-        const _setupProxy = (mesh, bone) => {
+        const setupProxy = (mesh, bone) => {
             const box    = new THREE.Box3().setFromObject(mesh);
             const size   = new THREE.Vector3();
             const center = new THREE.Vector3();
@@ -164,6 +165,8 @@ export class Tank {
                 new THREE.BoxGeometry(size.x, size.y, size.z),
                 invisible
             );
+            // Make sure we won't make it visible later onDestroy
+            proxy.userData.isProxy = true;
             proxy.position.copy(center);
             scene.add(proxy);
 
@@ -172,24 +175,49 @@ export class Tank {
             return proxy;
         };
 
-        this.hullProxy   = _setupProxy(this.hullMesh,   this.hullBone);
-        this.turretProxy = _setupProxy(this.turretMesh, this.turretBone);
-        this.gunProxy    = _setupProxy(this.gunMesh,    this.gunBone);
+        this.hullProxy   = setupProxy(this.hullMesh,   this.hullBone);
+        this.turretProxy = setupProxy(this.turretMesh, this.turretBone);
+        this.gunProxy    = setupProxy(this.gunMesh,    this.gunBone);
     }
 
     // Using raycast to check collision
-    isHitBy(rayOrigin, rayDirection) {
-        this._raycaster.set(rayOrigin, rayDirection);
-        const hits = this._raycaster.intersectObject(this.group, true);
-        return hits.length > 0;
+    isHitBy(rayOrigin, rayDirection, maxDistance) {
+            this._raycaster.set(rayOrigin, rayDirection);
+            
+            // Limit the raycaster to only check the distance the missile traveled this exact frame
+            this._raycaster.far = maxDistance; 
+            
+            const hits = this._raycaster.intersectObject(this.group, true);
+            if (hits.length > 0){
+                this.hit();
+                return true;
+            }
+            return false;
+        }
+
+    // When tank is destroyed, pitch the gun down and change color to look charred
+    onDeath() {
+        // Char the hull
+        this.model.traverse((obj) => {
+            if (obj.isMesh && !obj.userData.isOutline && !obj.userData.isProxy) {
+                obj.material = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+            }
+        });
+
+        // Droop the gun down
+        if (this.gunBone) {
+            this.gunBone.rotation.z = -this.PITCH_MIN;
+        }
+
+        // Slump the turret slightly
+        if (this.turretBone) {
+            this.turretBone.rotation.y = (Math.random() - 0.5) * 0.5;
+        }
     }
 
     // Handles state machine and transform sync
     update(delta, scene) {
         // Sync group transform from class properties
-        this.group.position.copy(this.position);
-        this.group.rotation.copy(this.rotation);
-        this.group.scale.copy(this.scale);
         this.group.updateMatrixWorld(true);
 
         // Only increment timer when tank is not dead
@@ -210,11 +238,10 @@ export class Tank {
                 break;
 
             case TankState.COOKOFF:
-                // Tank will stop and explode after a few seconds
-                // Particle system will be added here later if there is time left
                 if (this.stateTimer > 3.0) {
                     this.state      = TankState.DEAD;
                     this.stateTimer = 0;
+                    this.onDeath();  // call once on transition
                 }
                 break;
 

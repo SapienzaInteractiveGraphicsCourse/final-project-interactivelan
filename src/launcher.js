@@ -1,11 +1,14 @@
 import * as THREE from 'three';
+import { Missile } from './missile';
 
 // Let's define some states for our launcher
 export const LauncherState = Object.freeze({
     // Missile is in flight
     FIRED:      'FIRED',
-    // Missile lost or hit a target, launcher is ready to be reloaded
-    POST_FIRE:  'POST_FIRE',
+    // We are tossing the used tube before reloading
+    TOSSING:  'TOSSING',
+    // Our launcher is ready to be reloaded: missile lost or destroyed
+    POST_FIRE: 'POST_FIRE',
     // Launcher cannot be used, reload animation is in progress
     RELOADING:  'RELOADING',
     // Launcher ready to fire
@@ -39,6 +42,12 @@ export class Launcher {
         this.PITCH_SPEED = 0.8;
         this.PITCH_MIN   = -0.3;
         this.PITCH_MAX   = 0.3;
+
+        // Add reference to our current missile and tanks we are allowed to
+
+        // Currently steered missile
+        this.missile = null;
+        this.tanks   = [];
 
         // Reload animation duration in seconds
         this.RELOAD_DURATION = 1;
@@ -236,22 +245,30 @@ export class Launcher {
             this.looseTubePhysics.mesh.position.addScaledVector(this.looseTubePhysics.velocity, delta);
 
             // Get bottom of mesh, not center
-            // Another bounding box, yay
             const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
+            
             // Stop when on the ground
             if (box.min.y <= 0) {
                 this.looseTubePhysics.mesh.position.y += -box.min.y;
                 this.looseTubePhysics.velocity.set(0, 0, 0);
-                // Physics done — clear physics data but keep mesh reference for cleanup on reload
+                
+                // Physics done: clear physics data
                 this.looseTubePhysics = null;
 
-                // This is temporary: after the tube is tossed we enter POST_FIRE State.
-                // It will be changed later
-                this.state = LauncherState.POST_FIRE;
+                // If we were tossing, start the actual reload animation now
+                if (this.state === LauncherState.TOSSING) {
+                    this.state       = LauncherState.RELOADING;
+                    this.reloadTimer = 0;
+
+                    // Move the bone above its rest position and make new tube visible
+                    this.missileBone.position.set(0, 2, 0);
+                    this.reloadStartPos.copy(this.missileBone.position);
+                    this.tubeMesh.visible = true;
+                }
             }
         }
 
-        // Reload animation — lerp bone from above down to rest position
+        // Reload animation we lerp the bone position from above down to rest position
         if (this.state === LauncherState.RELOADING) {
             this.reloadTimer += delta;
             const t = Math.min(this.reloadTimer / this.RELOAD_DURATION, 1);
@@ -260,13 +277,32 @@ export class Launcher {
             const smooth = t * t * (3 - 2 * t);
             this.missileBone.position.lerpVectors(this.reloadStartPos, this.tubeRestPosition, smooth);
 
-            // Reload complete — back to ready
+            // Reload complete, we are back to ready state
             if (t >= 1) {
                 this.reloadTimer = 0;
                 this.state       = LauncherState.READY;
             }
             
         }
+        // Update missile if in flight
+        if (this.missile && this.missile.alive) {
+            const target = this.getSightTarget(scene);
+            const hit    = this.missile.update(delta, target, this.tanks, scene);
+            if (hit || !this.missile.alive) {
+                this.missile  = null;
+                this.state    = LauncherState.POST_FIRE;
+            }
+        }
+    }
+
+    // Add tank to list of our available targets
+    registerTank(tank) {
+        this.tanks.push(tank);
+    }
+
+    // Remove tank from list of available targets
+    removeTank(tank) {
+        this.tanks = this.tanks.filter(t => t !== tank);
     }
 
     // Add the launcher to a scene
@@ -296,33 +332,63 @@ export class Launcher {
         }
     }
 
-    // Trigger the tube toss
-    fire(scene) {
-        // If the launcher isn't ready to fire, return
-        if (this.state != LauncherState.READY) return;
-        // TODO: Add code for handling the missile and everything
-        this.state            = LauncherState.FIRED;
-        this.looseTubePhysics = this.tossTube(scene);
-    }
+    // We want to know where the player is aiming:
+    // A ray will be 'shot' from the center of the launcher's camera at exactly 1000 units distance
+    // This is to prevent weird UTurns or manouvers impossible to real ATGMS
+    getSightTarget() {
+            if (!this.sightCamera) return null;
 
-    reload(scene) {
-        if (this.state != LauncherState.POST_FIRE) return;
+            // Force matrix update so we shoot from the exact current rotation
+            this.sightCamera.updateMatrixWorld(true);
 
-        // Remove the old tube mesh from the scene before reloading
-        if (this.looseTubeMesh) {
-            scene.remove(this.looseTubeMesh);
-            this.looseTubeMesh = null;
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sightCamera);
+
+            const targetPoint = new THREE.Vector3();
+            
+            // Instead of calculating ray collisions against the whole scene, 
+            // we just place the target 1000 meters straight down the camera's line of sight.
+            // Because your missile's max range is 500m, this point is ALWAYS in front of it.
+            raycaster.ray.at(1000, targetPoint);
+
+            return targetPoint;
         }
 
-        // Enter reload state
-        this.state       = LauncherState.RELOADING;
-        this.reloadTimer = 0;
+    // Missile is fired
+    fire(scene) {
+            if (this.state !== LauncherState.READY) return;
 
-        // Move the bone above its rest position and make tube visible again
-        this.missileBone.position.set(0, 2, 0);
-        this.reloadStartPos.copy(this.missileBone.position);
-        this.tubeMesh.visible = true;
-    }
+            // Get spawn position and direction from launcher bone
+            const spawnPos = new THREE.Vector3();
+            const spawnDir = new THREE.Vector3();
+
+            // Get position and direction of our missile
+            this.launcherBone.getWorldPosition(spawnPos);
+            this.launcherBone.getWorldDirection(spawnDir);
+            spawnDir.negate();
+
+            // Spawn new missile
+            this.missile = new Missile(spawnPos, spawnDir);
+            this.missile.addToScene(scene);
+
+            // Transition to FIRED state (locks out reloading until impact)
+            this.state = LauncherState.FIRED;
+        }
+
+    reload(scene) {
+            // Only allow reload AFTER the missile is destroyed/lost
+            if (this.state !== LauncherState.POST_FIRE) return;
+
+            // Remove the old tube mesh from a PREVIOUS reload before tossing a new one
+            if (this.looseTubeMesh) {
+                scene.remove(this.looseTubeMesh);
+                this.looseTubeMesh = null;
+            }
+
+            // Enter tossing state and trigger the toss
+            this.state = LauncherState.TOSSING;
+            this.looseTubePhysics = this.tossTube(scene);
+        }
 
     // After firing, the tube is tossed to the side (like the real life counterpart)
     tossTube(scene) {

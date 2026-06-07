@@ -65,6 +65,9 @@ window.addEventListener('resize', () => {
 // Declare launcher so that it's accessible in animate()
 let launcher;
 
+// Declare launcher so that it's accessible in animate() and aniamte()
+let tank;
+
 // Performance monitor
 let lastTime = performance.now();
 // Input handler
@@ -92,8 +95,10 @@ async function init() {
     controls.target.copy(center);
 
     const model_tank = await loadModel('/assets/models/tank.glb');
-    const tank = new Tank(model_tank);
-    tank.addToScene(scene, new THREE.Vector3(10, 0, 5));
+    tank = new Tank(model_tank);
+    tank.addToScene(scene, new THREE.Vector3(100, 0, 5));
+    // Add tank to list of hittable tanks of our launcher
+    launcher.registerTank(tank);
 }
 
 init();
@@ -108,6 +113,9 @@ function animate() {
     }
 
     controls.update();
+    if (tank){
+        tank.update(delta, scene);
+    }
 
     // Make sure launcher is defined when animate runs (it gets assigned after init() is ran)
     renderer.render(scene, launcher?.activeCamera ?? camera);

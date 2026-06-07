@@ -189,7 +189,6 @@ export class Tank {
             
             const hits = this._raycaster.intersectObject(this.group, true);
             if (hits.length > 0){
-                this.hit();
                 return true;
             }
             return false;

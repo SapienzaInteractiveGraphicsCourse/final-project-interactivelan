@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { applyCellShading } from './shaders.js';
+import { applyCellShading } from '../rendering/shaders.js';
 
 // Let's define some states for our tank
 export const TankState = Object.freeze({
@@ -200,7 +200,16 @@ export class Tank {
         // Char the hull
         this.model.traverse((obj) => {
             if (obj.isMesh && !obj.userData.isOutline && !obj.userData.isProxy) {
-                obj.material = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+                // Change material of tank when destroyed
+                obj.material = new THREE.MeshStandardMaterial({
+                    // charred brown-gray
+                    color: 0x3b342e,        
+                    roughness: 0.92,
+                    metalness: 0.18,
+                    // subtle warm burnt tone
+                    emissive: 0x22110a,     
+                    emissiveIntensity: 0.08
+                });
             }
         });
 
@@ -210,9 +219,9 @@ export class Tank {
         }
 
         // Slump the turret slightly
-        if (this.turretBone) {
-            this.turretBone.rotation.y = (Math.random() - 0.5) * 0.5;
-        }
+        //if (this.turretBone) {
+        //    this.turretBone.rotation.y = (Math.random() - 0.5) * 0.5;
+        //}
     }
 
     // Handles state machine and transform sync

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { applyCellShading } from './shaders.js';
+import { applyCellShading } from '../rendering/shaders.js';
 
 // Constants, will be changed or moved
 const SPEED          = 50;

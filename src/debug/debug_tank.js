@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { loadModel }     from '../entities.js';
-import { InputHandler }  from '../input.js';
-import { Tank }          from '../tank.js';
+import { loadModel }     from '../utilities/loader.js';
+import { InputHandler }  from '../core/input.js';
+import { Tank }          from '../entities/tank.js';
 
 // Class to help debug tank hitboxes and such
 class TankDebugger {

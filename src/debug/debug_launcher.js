@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { loadModel } from '../entities.js';
-import { Launcher } from '../launcher.js';
-import { InputHandler } from '../input.js';
-import { applyCellShading } from '../shaders.js';
+import { loadModel } from '../utilities/loader.js';
+import { Launcher } from '../entities/launcher.js';
+import { InputHandler } from '../core/input.js';
+import { applyCellShading } from '../rendering/shaders.js';
 
 // temporary to test the new camera
-import { Tank }          from '../tank.js';
+import { Tank }          from '../entities/tank.js';
 
 // Some code borrowed from debug_terrain.js
 const scene  = new THREE.Scene();

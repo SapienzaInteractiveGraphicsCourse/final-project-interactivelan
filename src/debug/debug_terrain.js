@@ -5,8 +5,8 @@ import * as THREE from 'three';
 // Orbital controls for debugging map
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // From world.js, import functions that need testing
-import { createTerrain, placeTrees } from '../world.js';
-import { loadTreeModels } from '../entities.js';
+import { createTerrain, placeTrees } from '../core/world.js';
+import { loadTreeModels } from '../utilities/loader.js';
 
 
 const scene = new THREE.Scene();

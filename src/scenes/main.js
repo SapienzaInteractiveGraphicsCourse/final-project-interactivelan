@@ -8,6 +8,7 @@ import { updateExplosions } from '../rendering/effects.js';
 import { Tank }          from '../entities/tank.js';
 import { createTerrain, placeTrees } from '../core/world.js';
 import { loadTreeModels } from '../utilities/loader.js';
+import { createGrass } from '../core/grass.js';
 
 
 
@@ -42,6 +43,10 @@ light.shadow.camera.right  = 600;
 light.shadow.camera.top    = 600;
 light.shadow.camera.bottom = -600;
 light.castShadow = true;
+
+light.shadow.bias = -0.005;
+
+
 // To prevent fully black shadows we add a weak ambient light
 const ambient = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(light);
@@ -86,8 +91,8 @@ const navMap = resultTerrain.navMap;  // assigns to outer let navMap, not a new 
 // We load the trees'models 
 const treeModels = await loadTreeModels();
 // Place models on our terrain!
-placeTrees(scene, terrain, terrainSize, treeModels, 2, 0.6, navMap);
-
+placeTrees(scene, terrain, terrainSize, treeModels, 3, 0.6, navMap);
+createGrass(scene, terrain, renderer);
 
 // Target our tanks move toward to
 let target; 

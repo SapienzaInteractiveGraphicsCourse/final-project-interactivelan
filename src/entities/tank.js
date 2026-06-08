@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { applyCellShading } from '../rendering/shaders.js';
-
 import { spawnExplosion, createFire, createSmoke } from '../rendering/effects.js';
+import { materialTank } from '../rendering/materials.js';
 
 // Let's define some states for our tank
 export const TankState = Object.freeze({
@@ -64,7 +64,7 @@ export class Tank {
         model.position.y = -box.min.y;
 
         // Apply cell shading to the model
-        applyCellShading(model);
+        // applyCellShading(model);
 
         // Search for expected bones in loaded model
         // Our model should have:
@@ -80,9 +80,9 @@ export class Tank {
             }
             // In traverse, store mesh references
             if (obj.isMesh) {
-                if (obj.name === 'HullMesh')   this.hullMesh   = obj;
-                if (obj.name === 'TurretMesh') this.turretMesh = obj;
-                if (obj.name === 'GunMesh')    this.gunMesh    = obj;
+                if (obj.name === 'HullMesh')   { this.hullMesh   = obj; obj.material = materialTank; }
+                if (obj.name === 'TurretMesh') { this.turretMesh = obj; obj.material = materialTank; }
+                if (obj.name === 'GunMesh')    { this.gunMesh    = obj; obj.material = materialTank; }
             }
         });
     }
@@ -208,20 +208,18 @@ export class Tank {
 
     // When tank is destroyed, pitch the gun down and change color to look charred
     onDeath() {
-        // Char the hull
         this.model.traverse((obj) => {
             if (obj.isMesh && !obj.userData.isOutline && !obj.userData.isProxy) {
-                // Change material of tank when destroyed
-                obj.material = new THREE.MeshStandardMaterial({
-                    // Charred brown-gray
-                    color: 0x3b342e,
-                    // Very arbitrary numbers until we have proper textures
-                    roughness: 0.92,
-                    metalness: 0.18,
-                    // subtle warm burnt tone
-                    emissive: 0x22110a,     
-                    emissiveIntensity: 0.08
-                });
+                // Tint the existing material to look charred rather than replacing it
+                obj.material = obj.material.clone();
+                obj.material.color.set(0x1a1a1a);
+                obj.material.roughness    = 0.95;
+                obj.material.metalness    = 0.05;
+                obj.material.emissive.set(0x110a00);
+                obj.material.emissiveIntensity = 0.12;
+                // Keep the normal map for surface detail but darken everything else
+                // obj.material.metalnessMap  = null;
+                // obj.material.roughnessMap  = null;
             }
         });
     }

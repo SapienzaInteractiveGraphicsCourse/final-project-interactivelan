@@ -3,9 +3,9 @@ import { createNoise2D } from 'simplex-noise';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createToonGradientMap, applyCellShading, applyTreeCellShading } from '../rendering/shaders.js';
 import { NavigationMap } from './navigation.js';
+import { materialTreeA, materialTreeB, materialTreeC, materialTerrain } from '../rendering/materials.js';
 
-
-
+const treeMaterials = [materialTreeA, materialTreeB, materialTreeC];
 // In this method we generate a size*size terrain that we will use in our scene.
 // We will use noise maps to generate displacement on our plane;
 
@@ -25,8 +25,8 @@ export function createTerrain(size, segments, frequency, amplitude) {
     // A temporary dark green color for our material.
     // I may switch to toon Materials down the line, very provisional code right now.
     // Using wireframe for debugging
-    const material = new THREE.MeshLambertMaterial({ color: "green", wireframe: false, flatShading: true});
-    const terrain  = new THREE.Mesh(geometry, material);
+    // const material = new THREE.MeshLambertMaterial({ color: "green", wireframe: false, flatShading: true});
+    const terrain  = new THREE.Mesh(geometry, materialTerrain);
     terrain.receiveShadow = true;  
     terrain.castShadow = false;
 
@@ -101,12 +101,26 @@ export async function placeTrees(scene, terrain, terrainSize, treeModels, treeSc
         let jitterZ = (Math.random() - 0.5) * 10;
 
         // Select a random tree model from the three available
-        let model = treeModels[Math.floor(Math.random() * treeModels.length)];
-        let tree  = model.clone();
+        //let model = treeModels[Math.floor(Math.random() * treeModels.length)];
+        //let tree  = model.clone();
         // We want trees to cast shadows
+        //tree.castShadow = true;
+
+        //applyTreeCellShading(tree);
+
+        const modelIndex = Math.floor(Math.random() * treeModels.length);
+        let model = treeModels[modelIndex];
+        let tree  = model.clone();
         tree.castShadow = true;
 
-        applyTreeCellShading(tree);
+        // Apply the matching material for this tree type
+        const treeMaterial = treeMaterials[modelIndex];
+        tree.traverse((obj) => {
+            if (obj.isMesh) {
+                obj.material = treeMaterial;
+                obj.geometry.setAttribute('uv2', obj.geometry.attributes.uv);
+            }
+        });
 
         // tree.position.set(x + jitterX, y, z + jitterZ);
 
@@ -124,5 +138,5 @@ export async function placeTrees(scene, terrain, terrainSize, treeModels, treeSc
 
         scene.add(tree);
     }
-
 }
+

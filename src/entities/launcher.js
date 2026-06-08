@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Missile } from './missile';
+import { materialLauncher } from '../rendering/materials';
 
 // Let's define some states for our launcher
 export const LauncherState = Object.freeze({
@@ -95,9 +96,11 @@ export class Launcher {
             }
 
             // Assign the mesh of our tube if it has the correct name to the variable
-            if (obj.isMesh && obj.name === 'TubeMesh') {
-                this.tubeMesh = obj;
+            if (obj.isMesh) {
+                if (obj.name === 'LauncherMesh')   { obj.material = materialLauncher; }
+                if (obj.name === 'TubeMesh')       { this.tubeMesh = obj;   obj.material = materialLauncher; }
             }
+            
         });
 
         // Store tube rest position before any animation, to use for our reload later

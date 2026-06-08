@@ -38,6 +38,7 @@ light.shadow.camera.right = 600;
 light.shadow.camera.top = 600;
 light.shadow.camera.bottom = -600;
 
+
 light.castShadow = true;
 scene.add(light);
 
@@ -98,7 +99,7 @@ async function init() {
     // We load the trees'models
     const treeModels = await loadTreeModels();
     // Place models on our terrain!
-    placeTrees(scene, terrain, terrainSize, treeModels, 2, 0.6, navMap);
+    placeTrees(scene, terrain, terrainSize, treeModels, 3, 0.6, navMap);
     // Visualize our navMap
     // navMap.visualize(scene);
 

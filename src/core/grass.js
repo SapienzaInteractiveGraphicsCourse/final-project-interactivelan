@@ -113,7 +113,8 @@ function generateHeightMap(terrain, renderer) {
     return { texture: target.texture, bbox };
 }
 
-// Vertex shader — adapted from Peter Adams / Antaeus AR
+// Vertex shader adapted from Peter Adams / Antaeus AR
+// I would have had no idea how to implement it without his cool blogpost
 // Source: https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff
 const vertexShader = `
     uniform float uTime;
@@ -260,7 +261,7 @@ const vertexShader = `
     }
 `;
 
-// Fragment shader — outputs per-vertex grass color
+// Fragment shader: outputs per-vertex grass color
 const fragmentShader = `
     varying vec3 vColor;
     void main() {
@@ -268,7 +269,8 @@ const fragmentShader = `
     }
 `;
 
-// Build the grass geometry — all three vertices of each blade start at the same position
+// Build the grass geometry
+// All three vertices of each blade start at the same position
 // The vertex shader uses color attributes to spread them into a triangle
 function buildGrassGeometry(count, patchSize) {
     const positions    = [];

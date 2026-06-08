@@ -67,13 +67,14 @@ window.addEventListener('resize', () => {
 // Declare launcher so that it's accessible in animate()
 let launcher;
 
-// Declare launcher so that it's accessible in animate() and aniamte()
+// Declare tank so that it's accessible in animate() and aniamte()
 let tank;
 
 // Performance monitor
 let lastTime = performance.now();
 // Input handler
 const input  = new InputHandler();
+
 
 async function init() {
     // Load the ATGM launcher model
@@ -116,7 +117,7 @@ function animate() {
 
     controls.update();
     if (tank){
-        tank.update(delta);
+        tank.update(delta, launcher?.activeCamera ?? camera);
     }
 
     updateExplosions(delta);

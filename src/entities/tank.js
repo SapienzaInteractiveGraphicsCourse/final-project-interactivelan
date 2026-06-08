@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { applyCellShading } from '../rendering/shaders.js';
 
-import { spawnExplosion } from '../rendering/effects.js';
+import { spawnExplosion, createFire, createSmoke } from '../rendering/effects.js';
 
 // Let's define some states for our tank
 export const TankState = Object.freeze({
@@ -24,7 +24,7 @@ export class Tank {
         this.state      = TankState.ALIVE;
         this.stateTimer = 0;
 
-        // Reference to scene
+        // Reference to scene 
         this.scene = null;
 
         // Transform properties
@@ -57,7 +57,7 @@ export class Tank {
         this.group.add(model);
 
         // Raycaster to check for collisions
-        this._raycaster = new THREE.Raycaster();
+        this.raycaster = new THREE.Raycaster();
 
         // Make sure the tank is touching the ground
         const box = new THREE.Box3().setFromObject(model);
@@ -194,12 +194,12 @@ export class Tank {
 
     // Using raycast to check collision
     isHitBy(rayOrigin, rayDirection, maxDistance) {
-            this._raycaster.set(rayOrigin, rayDirection);
+            this.raycaster.set(rayOrigin, rayDirection);
             
             // Limit the raycaster to only check the distance the missile traveled this exact frame
-            this._raycaster.far = maxDistance; 
+            this.raycaster.far = maxDistance; 
             
-            const hits = this._raycaster.intersectObject(this.group, true);
+            const hits = this.raycaster.intersectObject(this.group, true);
             if (hits.length > 0){
                 return true;
             }
@@ -224,16 +224,10 @@ export class Tank {
                 });
             }
         });
-
-
-        // Slump the turret slightly
-        //if (this.turretBone) {
-        //    this.turretBone.rotation.y = (Math.random() - 0.5) * 0.5;
-        //}
     }
 
     // Handles state machine and transform sync
-    update(delta) {
+    update(delta, camera) {
         // Sync group transform from class properties
         this.group.updateMatrixWorld(true);
 
@@ -256,29 +250,62 @@ export class Tank {
 
             case TankState.COOKOFF:
                 // After being hit, start a timer before explosion
-                if (this.stateTimer > 1.0) {
+                const firePos = new THREE.Vector3();
+                this.turretBone.getWorldPosition(firePos);
+
+
+                if (!this.fire) {
+                    this.fire  = createFire(this.scene, firePos, camera);
+                    this.smoke = createSmoke(this.scene, firePos, camera);
+                }
+
+                // Update effects each frame
+                this.fire?.update(delta, camera);
+                this.smoke?.update(delta, camera);
+
+                if (this.stateTimer > 2.0) {
                     this.state      = TankState.DEAD;
                     this.stateTimer = 0;
                     this.onDeath();  
                 }
                 break;
 
+
+
             case TankState.DEAD:
-                // When tank is Dead, the gun will sag down slowly
-                // Some hardcoded numbers for now
+                if (this.fire && this.smoke){
+                // Update effects each frame
+                this.fire?.update(delta, camera);
+                this.smoke?.update(delta, camera);
+                }
+
+
+                // Lerp gun down to sag position
                 if (this.gunBone) {
                     this.gunBone.rotation.z = THREE.MathUtils.lerp(
                         this.gunBone.rotation.z,
-                        - this.PITCH_MIN,
-                        0.5 * delta
+                        -this.PITCH_MIN,
+                        0.8 * delta
                     );
-
-                    // Stop lerping when close enough
-                    if (Math.abs(this.gunBone.rotation.z - - this.PITCH_MIN) < 0.001) {
-                        this.gunBone.rotation.z = - this.PITCH_MIN;
-                    }
                 }
                 break;
         }
     }
+
+    destroy() {
+        // Clean up fire and smoke effects
+        this.fire?.destroy();
+        this.smoke?.destroy();
+        this.fire  = null;
+        this.smoke = null;
+
+        // Remove group from scene
+        this.scene.remove(this.group);
+
+        // Remove proxy meshes
+        this.scene.remove(this.hullProxy);
+        this.scene.remove(this.turretProxy);
+        this.scene.remove(this.gunProxy);
+    }
+
 }

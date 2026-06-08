@@ -1,10 +1,24 @@
 import * as THREE from 'three';
 
-// Constants for our particles, shades of orange and red
-const COLORS = [0xff4500, 0xff8c00, 0xffd700, 0xff2200];
+// Constants for our particles
+
+// Explosion color constants
+const EXPLOSION_COLORS = [0xff4500, 0xff8c00, 0xffd700, 0xff2200];
+
+// Fire constants
+const FIRE_COLORS       = [0xff4500, 0xff6a00, 0xff8c00];
+const FIRE_SPRITE_COUNT = 12;
+const FIRE_RISE_SPEED   = 2.5;
+const FIRE_MAX_HEIGHT   = 4.0;
+
+// Smoke constants
+const SMOKE_COLORS       = [0x333333, 0x555555, 0x222222];
+const SMOKE_SPRITE_COUNT = 10;
+const SMOKE_RISE_SPEED   = 1.2;
+const SMOKE_MAX_HEIGHT   = 6.0;
 
 // All active explosions: each element of activeExplosions is an array of particles
-const activeExplosions = [];
+const activeEffects = [];
 
 // Spawn a new explosion at a given world position
 export function spawnExplosion(scene, position, count, lifetime) {
@@ -15,7 +29,7 @@ export function spawnExplosion(scene, position, count, lifetime) {
         const mesh = new THREE.Mesh(
             new THREE.SphereGeometry(size),
             new THREE.MeshBasicMaterial({
-                color: COLORS[Math.floor(Math.random() * COLORS.length)]
+                color: EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)]
             })
         );
 
@@ -38,13 +52,125 @@ export function spawnExplosion(scene, position, count, lifetime) {
     }
 
     // Store lifetime alongside particles and scene so updateExplosions can read it
-    activeExplosions.push({ particles, scene, lifetime });
+    activeEffects.push({ particles, scene, lifetime });
 }
+
+
+// Helper class for handling Smoke and Fire effects.
+// A looping sprite system seems to be the correct approach from what I can find online
+class SpriteSystem {
+    constructor(scene, position, camera, colors, count, riseSpeed, maxHeight, minSize, maxSize, spread = 0.6) {
+        this.scene     = scene;
+        this.position  = position;
+        this.camera    = camera;
+        this.riseSpeed = riseSpeed;
+        this.maxHeight = maxHeight;
+        this.spread    = spread;
+        this.sprites   = [];
+
+        // Stagger start heights so sprites don't all reset at the same time
+        // Basically we just randomize a bit the starting position
+        for (let i = 0; i < count; i++) {
+            const mesh = this.createSpriteMesh(colors, minSize, maxSize);
+            this.spawnSprite(mesh);
+            scene.add(mesh);
+            this.sprites.push(mesh);
+        }
+    }
+
+    // Create a basic plane to use as our sprite
+    createSpriteMesh(colors, minSize, maxSize) {
+        const size = minSize + Math.random() * (maxSize - minSize);
+        return new THREE.Mesh(
+            new THREE.PlaneGeometry(size, size),
+            new THREE.MeshBasicMaterial({
+                color:       colors[Math.floor(Math.random() * colors.length)],
+                transparent: true,
+                depthWrite:  false,
+                side:        THREE.DoubleSide,
+            })
+        );
+    }
+
+    // Spawn a single sprite at a random position within the effect radius
+    spawnSprite(mesh) {
+        mesh.position.set(
+            this.position.x + (Math.random() - 0.5) * this.spread,
+            this.position.y + Math.random() * this.maxHeight,
+            this.position.z + (Math.random() - 0.5) * this.spread
+        );
+    }
+
+    // Reset a sprite back to the bottom after it reaches the top
+    resetSprite(mesh) {
+        mesh.position.set(
+            this.position.x + (Math.random() - 0.5) * this.spread,
+            this.position.y,
+            this.position.z + (Math.random() - 0.5) * this.spread
+        );
+        mesh.material.opacity = 1;
+    }
+
+    update(delta, camera) {
+        this.camera = camera;
+        for (const sprite of this.sprites) {
+            sprite.position.y += this.riseSpeed * delta;
+
+            // Progress from 0 to 1 as sprite rises toward max height
+            const t = (sprite.position.y - this.position.y) / this.maxHeight;
+
+            // Fade out and shrink as the sprite rises
+            sprite.material.opacity = Math.max(0, 1 - t);
+            sprite.scale.setScalar(Math.max(0.1, 1 - t * 0.6));
+
+            // Billboard toward main camera so the flat plane always faces the player
+            // Billboarding: think of DOOM sprites always facing the camera
+            const worldQuat = new THREE.Quaternion();
+            this.camera.getWorldQuaternion(worldQuat);
+            sprite.quaternion.copy(worldQuat);
+
+            if (sprite.position.y >= this.position.y + this.maxHeight) this.resetSprite(sprite);
+        }
+    }
+
+    destroy() {
+        // Remove all sprites from scene and free their GPU resources
+        for (const sprite of this.sprites) {
+            this.scene.remove(sprite);
+            sprite.geometry.dispose();
+            sprite.material.dispose();
+        }
+        this.sprites.length = 0;
+    }
+}
+
+// Create a looping fire effect at a given world position
+export function createFire(scene, position, camera) {
+    return new SpriteSystem(
+        scene, position, camera,
+        FIRE_COLORS, FIRE_SPRITE_COUNT,
+        FIRE_RISE_SPEED, FIRE_MAX_HEIGHT,
+        0.3, 0.7
+    );
+}
+
+// Create a looping smoke effect at a given world position
+export function createSmoke(scene, position, camera) {
+    return new SpriteSystem(
+        scene, position, camera,
+        SMOKE_COLORS, SMOKE_SPRITE_COUNT,
+        SMOKE_RISE_SPEED, SMOKE_MAX_HEIGHT,
+        0.5, 1.0,
+        1.8
+    );
+}
+
+
 
 // Call this every frame in our animate loop to update effects
 export function updateExplosions(delta) {
-    for (let e = activeExplosions.length - 1; e >= 0; e--) {
-        const { particles, scene, lifetime } = activeExplosions[e];
+    for (let e = activeEffects.length - 1; e >= 0; e--) {
+        const { particles, scene, lifetime } = activeEffects[e];
 
         for (let p = particles.length - 1; p >= 0; p--) {
             const particle = particles[p];
@@ -56,7 +182,7 @@ export function updateExplosions(delta) {
             particle.velocity.y -= 4.0 * delta;
             particle.mesh.position.addScaledVector(particle.velocity, delta);
 
-            // Shrink to zero over lifetime
+            // Shrink to zero over lifetime (they disappear seamlessly)
             const scale = Math.max(0, 1 - t);
             particle.mesh.scale.setScalar(scale);
 
@@ -71,7 +197,7 @@ export function updateExplosions(delta) {
 
         // Remove explosion from active list when all particles are gone
         if (particles.length === 0) {
-            activeExplosions.splice(e, 1);
+            activeEffects.splice(e, 1);
         }
     }
 }

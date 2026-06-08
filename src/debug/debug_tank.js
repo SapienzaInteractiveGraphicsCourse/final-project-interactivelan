@@ -119,7 +119,7 @@ async function init() {
     // Load the tank model and hand it to the Tank class
     const model = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
     tank = new Tank(model);
-    tank.addToScene(scene, new THREE.Vector3(0,0,0));
+    tank.addToScene(scene,  new THREE.Vector3(0,0,0));
 
     // Start debugger
     const tankDebugger = new TankDebugger(tank, scene, camera, renderer, input);
@@ -160,7 +160,7 @@ function animate() {
         // Simulate tank being hit at static position
         if (input.isDown('KeyH')) tank.hit(hitPosition);
 
-        tank.update(delta, scene);
+        tank.update(delta, camera);
     }
 
 

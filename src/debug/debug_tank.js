@@ -115,6 +115,8 @@ const input  = new InputHandler();
 
 const hitPosition = new THREE.Vector3(-3, 2, 2.5);
 
+let lastTime = performance.now();
+
 async function init() {
     // Load the tank model and hand it to the Tank class
     const model = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);

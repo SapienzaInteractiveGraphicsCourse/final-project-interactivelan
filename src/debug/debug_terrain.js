@@ -65,6 +65,7 @@ let navMapVisible = false;
 let navMapMeshes  = [];
 let navMap;
 
+
 // If N is pressed, show the generated navMap
 window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyN') {

@@ -7,21 +7,15 @@ const EXPLOSION_COLORS = [0xff4500, 0xff8c00, 0xffd700, 0xff2200];
 
 // Fire constants
 const FIRE_COLORS       = [0xff4500, 0xff6a00, 0xff8c00];
-const FIRE_SPRITE_COUNT = 12;
-const FIRE_RISE_SPEED   = 2.5;
-const FIRE_MAX_HEIGHT   = 4.0;
 
 // Smoke constants
 const SMOKE_COLORS       = [0x333333, 0x555555, 0x222222];
-const SMOKE_SPRITE_COUNT = 10;
-const SMOKE_RISE_SPEED   = 1.2;
-const SMOKE_MAX_HEIGHT   = 6.0;
 
 // All active explosions: each element of activeExplosions is an array of particles
 const activeEffects = [];
 
 // Spawn a new explosion at a given world position
-export function spawnExplosion(scene, position, count, lifetime) {
+export function spawnExplosion(scene, position, count, lifetime, colors = EXPLOSION_COLORS) {
     const particles = [];
 
     for (let i = 0; i < count; i++) {
@@ -145,23 +139,23 @@ class SpriteSystem {
 }
 
 // Create a looping fire effect at a given world position
-export function createFire(scene, position, camera) {
+export function createFire(scene, position, camera, spriteCount = 8, riseSpeed = 2.5, maxHeight = 2.0, minSize = 0.3, maxSize = 0.7) {
     return new SpriteSystem(
         scene, position, camera,
-        FIRE_COLORS, FIRE_SPRITE_COUNT,
-        FIRE_RISE_SPEED, FIRE_MAX_HEIGHT,
-        0.3, 0.7
+        FIRE_COLORS, spriteCount,
+        riseSpeed, maxHeight,
+        minSize, maxSize
     );
 }
 
 // Create a looping smoke effect at a given world position
-export function createSmoke(scene, position, camera) {
+export function createSmoke(scene, position, camera, spriteCount = 10, riseSpeed = 1.2, maxHeight = 6.0, minSize = 0.5, maxSize = 1.0, spread = 1.8) {
     return new SpriteSystem(
         scene, position, camera,
-        SMOKE_COLORS, SMOKE_SPRITE_COUNT,
-        SMOKE_RISE_SPEED, SMOKE_MAX_HEIGHT,
-        0.5, 1.0,
-        1.8
+        SMOKE_COLORS, spriteCount,
+        riseSpeed, maxHeight,
+        minSize, maxSize,
+        spread
     );
 }
 

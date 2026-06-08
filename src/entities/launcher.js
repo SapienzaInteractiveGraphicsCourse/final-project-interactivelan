@@ -305,11 +305,16 @@ export class Launcher {
     }
 
     // Add the launcher to a scene
-    addToScene(scene) {
+    addToScene(scene, position) {
         scene.add(this.group);
         // Calculate bounding box, use it's lowest positon as base to place it
         const box = new THREE.Box3().setFromObject(this.group);
-        this.group.position.y = -box.min.y;
+
+        // Assign movel at y coordinate that would make launcher touch the ground, and given X and Z
+        this.group.position.y = position.y - box.min.y;
+        this.group.position.x = position.x;
+        this.group.position.z = position.z;
+
 
         // Sight camera is parented to Launcher bone, moves with it
         // It has a small FOV since it's supposed to be a telescopic sight

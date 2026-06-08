@@ -11,5 +11,6 @@ if (scene) {
     if (scene === 'terrain')  import('./debug_terrain.js');
     if (scene === 'launcher') import('./debug_launcher.js');
     if (scene === 'tank') import('./debug_tank.js');
+    if (scene === 'main') import ('../scenes/main.js');
     // if (scene === 'targets')  import('./targets.js');
 }

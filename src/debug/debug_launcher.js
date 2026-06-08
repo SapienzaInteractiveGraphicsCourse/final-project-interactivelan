@@ -81,7 +81,7 @@ async function init() {
     const model = await loadModel(`${import.meta.env.BASE_URL}models/launcher.glb`);
     applyCellShading(model);
     launcher = new Launcher(model);
-    launcher.addToScene(scene);
+    launcher.addToScene(scene, new THREE.Vector3(0,0,0));
     launcher.setMainCamera(camera);
 
     // Autoposition camera according to model's bounds, so it's always framed correctly

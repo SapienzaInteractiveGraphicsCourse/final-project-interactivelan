@@ -4,6 +4,8 @@ import { loadModel }     from '../utilities/loader.js';
 import { InputHandler }  from '../core/input.js';
 import { Tank }          from '../entities/tank.js';
 
+import { updateExplosions } from '../rendering/effects.js';
+
 // Class to help debug tank hitboxes and such
 class TankDebugger {
     constructor(tank, scene, camera, renderer, input) {
@@ -42,6 +44,7 @@ class TankDebugger {
                 new THREE.MeshBasicMaterial({ color: hit ? 0xff0000 : 0x00ff00 })
             );
             sphere.position.copy(hits[0].point);
+
             this.scene.add(sphere);
             setTimeout(() => this.scene.remove(sphere), 2000);
         });
@@ -110,6 +113,8 @@ let lastTime = performance.now();
 // Input handler
 const input  = new InputHandler();
 
+const hitPosition = new THREE.Vector3(-3, 2, 2.5);
+
 async function init() {
     // Load the tank model and hand it to the Tank class
     const model = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
@@ -152,12 +157,17 @@ function animate() {
             if (input.isDown('ArrowDown')) tank.gunBone.rotation.z = Math.min(0.4,  tank.gunBone.rotation.z + 0.8 * delta);
         }
 
-        // Simulate tank being hit
-        if (input.isDown('KeyH')) tank.hit();
+        // Simulate tank being hit at static position
+        if (input.isDown('KeyH')) tank.hit(hitPosition);
 
         tank.update(delta, scene);
     }
 
+
     controls.update();
+
+    updateExplosions(delta);
+
+
     renderer.render(scene, camera);
 }

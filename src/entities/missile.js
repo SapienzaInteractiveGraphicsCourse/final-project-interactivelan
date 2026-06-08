@@ -153,7 +153,7 @@ export class Missile {
         for (const tank of tanks) {
             // Pass the stepDistance as the third argument!
             if (tank.isHitBy(this.position, this.direction, stepDistance)) {
-                tank.hit();
+                tank.hit(this.position);
                 this.destroy(scene);
                 return true;
             }

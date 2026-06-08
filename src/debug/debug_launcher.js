@@ -5,6 +5,8 @@ import { Launcher } from '../entities/launcher.js';
 import { InputHandler } from '../core/input.js';
 import { applyCellShading } from '../rendering/shaders.js';
 
+import { updateExplosions } from '../rendering/effects.js';
+
 // temporary to test the new camera
 import { Tank }          from '../entities/tank.js';
 
@@ -114,8 +116,10 @@ function animate() {
 
     controls.update();
     if (tank){
-        tank.update(delta, scene);
+        tank.update(delta);
     }
+
+    updateExplosions(delta);
 
     // Make sure launcher is defined when animate runs (it gets assigned after init() is ran)
     renderer.render(scene, launcher?.activeCamera ?? camera);

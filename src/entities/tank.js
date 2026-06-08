@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { applyCellShading } from '../rendering/shaders.js';
 
+import { spawnExplosion } from '../rendering/effects.js';
+
 // Let's define some states for our tank
 export const TankState = Object.freeze({
     // Tank is moving and operational
@@ -16,10 +18,14 @@ export const TankState = Object.freeze({
 export class Tank {
     constructor(model) {
         this.model = model;
+
         // Tank starts alive
         // Who could have guessed
         this.state      = TankState.ALIVE;
         this.stateTimer = 0;
+
+        // Reference to scene
+        this.scene = null;
 
         // Transform properties
         this.position = new THREE.Vector3(0, 0, 0);
@@ -83,6 +89,10 @@ export class Tank {
 
     // Add the tank to a scene at specified position
     addToScene(scene, position = new THREE.Vector3()) {
+        // Store reference to scene
+        this.scene = scene;
+
+        // Add our tank to scene
         scene.add(this.group);
 
         // Sit on the ground after adding to scene
@@ -135,10 +145,12 @@ export class Tank {
     }
 
     // Tank is hit
-    hit() {
+    hit(hitPositon) {
         if (this.state !== TankState.ALIVE) return;
         this.state      = TankState.HIT;
         this.stateTimer = 0;
+
+        spawnExplosion(this.scene, hitPositon, 30, 1.5);
 
     }
 
@@ -201,8 +213,9 @@ export class Tank {
             if (obj.isMesh && !obj.userData.isOutline && !obj.userData.isProxy) {
                 // Change material of tank when destroyed
                 obj.material = new THREE.MeshStandardMaterial({
-                    // charred brown-gray
-                    color: 0x3b342e,        
+                    // Charred brown-gray
+                    color: 0x3b342e,
+                    // Very arbitrary numbers until we have proper textures
                     roughness: 0.92,
                     metalness: 0.18,
                     // subtle warm burnt tone
@@ -212,10 +225,6 @@ export class Tank {
             }
         });
 
-        // Droop the gun down
-        if (this.gunBone) {
-            this.gunBone.rotation.z = -this.PITCH_MIN;
-        }
 
         // Slump the turret slightly
         //if (this.turretBone) {
@@ -224,7 +233,7 @@ export class Tank {
     }
 
     // Handles state machine and transform sync
-    update(delta, scene) {
+    update(delta) {
         // Sync group transform from class properties
         this.group.updateMatrixWorld(true);
 
@@ -246,15 +255,29 @@ export class Tank {
                 break;
 
             case TankState.COOKOFF:
-                if (this.stateTimer > 3.0) {
+                // After being hit, start a timer before explosion
+                if (this.stateTimer > 1.0) {
                     this.state      = TankState.DEAD;
                     this.stateTimer = 0;
-                    this.onDeath();  // call once on transition
+                    this.onDeath();  
                 }
                 break;
 
             case TankState.DEAD:
-                // Tank is destroyed, nothing to do aside changing colors to something that makes it look charred
+                // When tank is Dead, the gun will sag down slowly
+                // Some hardcoded numbers for now
+                if (this.gunBone) {
+                    this.gunBone.rotation.z = THREE.MathUtils.lerp(
+                        this.gunBone.rotation.z,
+                        - this.PITCH_MIN,
+                        0.5 * delta
+                    );
+
+                    // Stop lerping when close enough
+                    if (Math.abs(this.gunBone.rotation.z - - this.PITCH_MIN) < 0.001) {
+                        this.gunBone.rotation.z = - this.PITCH_MIN;
+                    }
+                }
                 break;
         }
     }

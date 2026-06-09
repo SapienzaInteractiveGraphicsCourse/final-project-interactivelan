@@ -80,18 +80,18 @@ const modelTank = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
 const tanks = [];
 
 // We create our basic terrain
-const terrainSize = 500;
+const terrainSize = 250;
 const terrainSegments = 120;
-const resultTerrain = createTerrain(terrainSize, terrainSegments, 0.005, 15);
-const terrain = resultTerrain.terrain;
+const { terrain, navMap, launcherSpawn } = createTerrain(terrainSize, terrainSegments, 0.005, 15, new THREE.Vector3(100, 0,  100 ));
+// const terrain = resultTerrain.terrain;
 
 // Our Navmap
-const navMap = resultTerrain.navMap;  // assigns to outer let navMap, not a new local variable
+// const navMap = resultTerrain.navMap;  // assigns to outer let navMap, not a new local variable
 
 // We load the trees'models 
 const treeModels = await loadTreeModels();
 // Place models on our terrain!
-placeTrees(scene, terrain, terrainSize, treeModels, 3, 0.6, navMap);
+placeTrees(scene, terrain, terrainSize, treeModels, 3, 0.68, navMap);
 createGrass(scene, terrain, renderer);
 
 // Target our tanks move toward to
@@ -112,8 +112,13 @@ async function init() {
     // Add our terrain to the scene
     scene.add(terrain);
 
+    // Force update matrix
+    terrain.updateMatrixWorld(true); 
+
     // We are placing the launcehr at 0,0,0 but it's temporary
-    launcher.addToScene(scene, new THREE.Vector3(0,0,0));
+    //launcher.addToScene(scene, new THREE.Vector3(0,0,0));
+    launcher.addToScene(scene, launcherSpawn);
+
     launcher.setMainCamera(camera);
 
     // Get launcher's world position after it's been placed
@@ -149,7 +154,7 @@ function animate() {
     lastTime    = now;
 
     if (launcher) {
-        launcher.update(input, delta, scene);
+        launcher.update(input, delta, scene, terrain);
     }
 
     controls.update();

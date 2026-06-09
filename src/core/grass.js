@@ -3,10 +3,10 @@ import * as THREE from 'three';
 // Grass patch size around the launcher
 const PATCH_SIZE    = 500;
 // Number of grass blades
-const BLADE_COUNT   = 1600000;
+const BLADE_COUNT   = 1000000;
 // Blade dimensions
-const BLADE_WIDTH   = 0.09;
-const BLADE_HEIGHT  = 0.35;
+const BLADE_WIDTH   = 0.36;
+const BLADE_HEIGHT  = 0.30;
 
 // Generate a smooth noise texture on a canvas
 // Used for wind animation and height variation

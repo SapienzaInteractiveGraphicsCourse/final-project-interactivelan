@@ -145,13 +145,34 @@ export class Tank {
     }
 
     // Tank is hit
-    hit(hitPositon) {
+    hit(hitPosition, camera) {
         if (this.state !== TankState.ALIVE) return;
+
         this.state      = TankState.HIT;
         this.stateTimer = 0;
 
-        spawnExplosion(this.scene, hitPositon, 30, 1.5);
+        // Main blast
+        spawnExplosion(this.scene, hitPosition, 60, 2.4);
 
+        // Add immediate fire and smoke at impact point
+        if (!this.fire) {
+            this.fire  = createFire(this.scene, hitPosition, camera, 1.6);
+            this.smoke = createSmoke(this.scene, hitPosition, camera, 2.2);
+        }
+
+        // Small secondary blast for extra punch
+        setTimeout(() => {
+            if (this.scene && this.state !== TankState.DEAD) {
+                const secondaryPos = hitPosition.clone().add(
+                    new THREE.Vector3(
+                        (Math.random() - 0.5) * 1.5,
+                        0.8,
+                        (Math.random() - 0.5) * 1.5
+                    )
+                );
+                spawnExplosion(this.scene, secondaryPos, 35, 1.5);
+            }
+        }, 180);
     }
 
     // Choose a random death type

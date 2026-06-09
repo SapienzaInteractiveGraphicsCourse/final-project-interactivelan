@@ -31,14 +31,25 @@ export const materialTerrain = new THREE.MeshStandardMaterial({
     roughnessMap: loadTex(`${import.meta.env.BASE_URL}textures/terrain/Roughness.png`),
     aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/terrain/AO.png`),
 });
-materialTerrain.map.repeat.set(200, 200);
+materialTerrain.map.repeat.set(100, 100);
 materialTerrain.map.wrapS = THREE.RepeatWrapping;
 materialTerrain.map.wrapT = THREE.RepeatWrapping;
+
 // Same for other maps
-materialTerrain.normalMap.repeat.set(200, 200);
+materialTerrain.normalMap.repeat.set(100, 100);
 materialTerrain.normalMap.wrapS = THREE.RepeatWrapping;
 materialTerrain.normalMap.wrapT = THREE.RepeatWrapping;
 
+materialTerrain.roughnessMap.repeat.set(100, 100);
+materialTerrain.roughnessMap.wrapS = THREE.RepeatWrapping;
+materialTerrain.roughnessMap.wrapT = THREE.RepeatWrapping;
+
+materialTerrain.aoMap.repeat.set(100, 100);
+materialTerrain.aoMap.wrapS = THREE.RepeatWrapping;
+materialTerrain.aoMap.wrapT = THREE.RepeatWrapping;
+
+// Make the terrain normals stronger so light shows more surface detail
+materialTerrain.normalScale = new THREE.Vector2(2.0, 2.0);
 
 export const materialTreeA = new THREE.MeshStandardMaterial({
     map:          loadTex(`${import.meta.env.BASE_URL}textures/tree_a/Base.png`),

@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 
-// Grass patch size around the launcher
-const PATCH_SIZE    = 500;
+
+// Grass patch size 
+const PATCH_SIZE    = 300;
 // Number of grass blades
-const BLADE_COUNT   = 1000000;
+const BLADE_COUNT   = 500000;
 // Blade dimensions
 const BLADE_WIDTH   = 0.36;
-const BLADE_HEIGHT  = 0.30;
+const BLADE_HEIGHT  = 0.20;
+
 
 // Generate a smooth noise texture on a canvas
 // Used for wind animation and height variation
@@ -115,7 +117,7 @@ function generateHeightMap(terrain, renderer) {
 
 // Vertex shader adapted from Peter Adams / Antaeus AR
 // I would have had no idea how to implement it without his cool blogpost
-// Source: https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff
+// Source: [https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff](https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff)
 const vertexShader = `
     uniform float uTime;
     uniform sampler2D uNoiseTexture;
@@ -138,6 +140,7 @@ const vertexShader = `
 
     attribute vec3 aYaw;
     attribute vec3 aBladeOrigin;
+    attribute float aBladeScale;
 
     varying vec3 vColor;
 
@@ -201,6 +204,7 @@ const vertexShader = `
         vec3  heightNoise    = texture2D(uNoiseTexture, uv.yx * vec2(uHeightNoiseFrequency)).rgb;
         float heightModifier = ((heightNoise.r + heightNoise.g + heightNoise.b) * uMaxBladeHeight) * uHeightNoiseAmplitude;
         heightModifier      += random(uv) * (uRandomHeightAmount * 0.1);
+        heightModifier      *= aBladeScale;
 
         // Edge falloff so patch doesn't look like a square
         float edgeDistanceX = abs(origin.x) / halfPatchSize;
@@ -222,7 +226,7 @@ const vertexShader = `
 
         // Blade shape: use color attribute to identify bottom-left, bottom-right, top
         float factor = (color.r > 0.05) ? 1.0 : (color.b > 0.05) ? -1.0 : 0.0;
-        float width  = smoothstep(0.5, 1.0, heightModifier * 2.0) * uBladeWidth;
+        float width  = smoothstep(0.5, 1.0, heightModifier * 2.0) * uBladeWidth * aBladeScale;
         transformed += aYaw * (width / 2.0) * factor;
 
         // Grass color: dark at base, lighter at tip
@@ -277,6 +281,7 @@ function buildGrassGeometry(count, patchSize) {
     const colors       = [];
     const uvs          = [];
     const bladeOrigins = [];
+    const bladeScales  = [];
     const yaws         = [];
     const indices      = [];
 
@@ -284,10 +289,12 @@ function buildGrassGeometry(count, patchSize) {
     const yawUnitVec   = new THREE.Vector3();
 
     for (let i = 0; i < count; i++) {
-        const x   = THREE.MathUtils.randFloat(-halfPatch, halfPatch);
-        const z   = THREE.MathUtils.randFloat(-halfPatch, halfPatch);
-        const uv  = [x / patchSize + 0.5, z / patchSize + 0.5];
-        const yaw = Math.random() * Math.PI * 2;
+        const x          = THREE.MathUtils.randFloat(-halfPatch, halfPatch);
+        const z          = THREE.MathUtils.randFloat(-halfPatch, halfPatch);
+        const uv         = [x / patchSize + 0.5, z / patchSize + 0.5];
+        const yaw        = Math.random() * Math.PI * 2;
+        // We want a decently big size variation
+        const bladeScale = THREE.MathUtils.randFloat(0.7, 2.0);
 
         yawUnitVec.set(Math.sin(yaw), 0, -Math.cos(yaw));
 
@@ -306,17 +313,19 @@ function buildGrassGeometry(count, patchSize) {
             uvs.push(...uv);
             yaws.push(yawUnitVec.x, yawUnitVec.y, yawUnitVec.z);
             bladeOrigins.push(x, 0, z);
+            bladeScales.push(bladeScale);
         });
 
         indices.push(vArrOffset, vArrOffset + 1, vArrOffset + 2);
     }
 
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position',    new THREE.BufferAttribute(new Float32Array(positions),    3));
-    geometry.setAttribute('color',       new THREE.BufferAttribute(new Float32Array(colors),       3));
-    geometry.setAttribute('uv',          new THREE.BufferAttribute(new Float32Array(uvs),          2));
-    geometry.setAttribute('aYaw',        new THREE.BufferAttribute(new Float32Array(yaws),         3));
-    geometry.setAttribute('aBladeOrigin',new THREE.BufferAttribute(new Float32Array(bladeOrigins), 3));
+    geometry.setAttribute('position',     new THREE.BufferAttribute(new Float32Array(positions),    3));
+    geometry.setAttribute('color',        new THREE.BufferAttribute(new Float32Array(colors),       3));
+    geometry.setAttribute('uv',           new THREE.BufferAttribute(new Float32Array(uvs),          2));
+    geometry.setAttribute('aYaw',         new THREE.BufferAttribute(new Float32Array(yaws),         3));
+    geometry.setAttribute('aBladeOrigin', new THREE.BufferAttribute(new Float32Array(bladeOrigins), 3));
+    geometry.setAttribute('aBladeScale',  new THREE.BufferAttribute(new Float32Array(bladeScales),  1));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
@@ -324,7 +333,7 @@ function buildGrassGeometry(count, patchSize) {
 }
 
 // Create a grass system that follows the launcher as a sliding window
-// Source technique: https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff
+// Source technique: [https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff](https://medium.com/antaeus-ar/making-grass-with-triangles-in-glsl-using-three-js-e106771a71ff)
 // Adapted for StaticDefense by removing Game singleton and using launcher as center
 export function createGrass(scene, terrain, renderer) {
     const noiseTexture             = generateNoiseTexture();

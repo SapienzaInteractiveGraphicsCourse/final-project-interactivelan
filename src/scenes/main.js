@@ -80,9 +80,9 @@ const modelTank = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
 const tanks = [];
 
 // We create our basic terrain
-const terrainSize = 250;
+const terrainSize = 300;
 const terrainSegments = 120;
-const { terrain, navMap, launcherSpawn } = createTerrain(terrainSize, terrainSegments, 0.005, 15, new THREE.Vector3(100, 0,  100 ));
+const { terrain, navMap, launcherSpawn } = createTerrain(terrainSize, terrainSegments, 0.005, 4, new THREE.Vector3(100, 0,  100 ));
 // const terrain = resultTerrain.terrain;
 
 // Our Navmap
@@ -91,7 +91,7 @@ const { terrain, navMap, launcherSpawn } = createTerrain(terrainSize, terrainSeg
 // We load the trees'models 
 const treeModels = await loadTreeModels();
 // Place models on our terrain!
-placeTrees(scene, terrain, terrainSize, treeModels, 3, 0.68, navMap);
+placeTrees(scene, terrain, terrainSize, treeModels, 3, 0.7, navMap, launcherSpawn);
 createGrass(scene, terrain, renderer);
 
 // Target our tanks move toward to

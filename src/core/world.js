@@ -7,167 +7,255 @@ import { materialTreeA, materialTreeB, materialTreeC, materialTerrain } from '..
 
 const treeMaterials = [materialTreeA, materialTreeB, materialTreeC];
 
-// Radius of the flat disc carved at the launcher peak for clean tripod placement
-const PLATEAU_RADIUS = 3;
 
 // In this method we generate a size*size terrain that we will use in our scene.
 // We will use noise maps to generate displacement on our plane.
 // It is divided in segments*segments segments, and we will adjust the Y position of each of them according to noise map.
-// launcherPosition is a THREE.Vector3 — the terrain will naturally peak there for high ground advantage
-export function createTerrain(size, segments, frequency, amplitude, launcherPosition = new THREE.Vector3(0, 0, size / 2 - 20)) {
-    // Our base geometry: a flat plane of size size*size 
-    // and split in segments*segments segments (forgive my choice of variables).
+
+
+// Radius of the flat disc carved at the launcher peak for clean tripod placement
+const PLATEAU_RADIUS = 3;
+// Soft blend ring outside the plateau so the transition looks natural
+const PLATEAU_BLEND_RADIUS = 5;
+// Search radius where we look for the actual highest point of the hill
+const PEAK_SEARCH_RADIUS = 14;
+
+
+export function createTerrain(
+    size,
+    segments,
+    frequency,
+    amplitude,
+    launcherPosition = new THREE.Vector3(size * 0.35, 0, size * 0.35)
+) {
     const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
+    geometry.rotateX(-Math.PI / 2);
 
     const cellSize = size / segments;
-    // Create our navigation map
-    let navMap = new NavigationMap(size, cellSize);
+    const navMap   = new NavigationMap(size, cellSize);
 
     const terrain = new THREE.Mesh(geometry, materialTerrain);
     terrain.receiveShadow = true;
     terrain.castShadow    = false;
 
-    // By default it is created upright, we need to rotate it to have a terrain and not a wall.
-    geometry.rotateX(-Math.PI / 2);
 
-    // Let's generate our noise to use for terrain generation.
-    // We will take the value at x,z coordinates to determine elevation of corresponding vertex.
-    const noise = createNoise2D();
 
-    // Max possible distance from launcher to a corner of the terrain
-    // Used to normalize the hill boost falloff
-    const maxDist = Math.sqrt(2) * size / 2;
 
-    // Total number of vertices on our plane
-    const count = geometry.attributes.position.count;
+    const baseNoise   = createNoise2D();
+    const detailNoise = createNoise2D();
+    const shapeNoise  = createNoise2D();
 
-    // First pass: compute all heights including hill boost and quantization
-    // We need these before carving the plateau so we know the exact peak height
+    const count   = geometry.attributes.position.count;
     const heights = new Float32Array(count);
+
+
+
+
+    // We store the best peak candidate near the desired launcher region
+    let peakIndex = 0;
+    let peakY     = -Infinity;
+
+
+
+
     for (let i = 0; i < count; i++) {
-        let x = geometry.attributes.position.getX(i);
-        let z = geometry.attributes.position.getZ(i);
-        let y = noise(x * frequency, z * frequency) * amplitude;
+        const x = geometry.attributes.position.getX(i);
+        const z = geometry.attributes.position.getZ(i);
 
-        // Distance from this vertex to the launcher position
-        const distToLauncher = Math.sqrt(
-            (x - launcherPosition.x) ** 2 +
-            (z - launcherPosition.z) ** 2
-        );
+        // Main terrain shape
+        let y  = baseNoise(x * frequency, z * frequency) * amplitude;
+        y     += detailNoise(x * frequency * 2.5, z * frequency * 2.5) * amplitude * 0.35;
 
-        // Normalized distance from 0 (at launcher) to 1 (at farthest corner)
-        // Squared for a steeper falloff so the hill is pronounced but not too wide
-        const normalized = 1.0 - Math.min(distToLauncher / maxDist, 1.0);
-        y += normalized * normalized * amplitude * 1.5;
+        // Normalize terrain coordinates to 0..1
+        const nx = (x / (size * 0.5) + 1) * 0.5;
+        const nz = (z / (size * 0.5) + 1) * 0.5;
 
-        // Quantization of the terrain's heights:
-        // There will just be 8 possible heights of terrain, it will make npc movement easier later on
+        // We still bias the far corner a bit so the launcher area feels more dominant
+        const cornerBias = Math.pow(nx, 2.4) * Math.pow(nz, 2.4);
+        y += cornerBias * amplitude * 0.7;
+
+        // Broad high-ground area around the launcher
+        const dx = x - launcherPosition.x;
+        const dz = z - launcherPosition.z;
+        const dist = Math.hypot(dx, dz);
+
+        const hillRadius = size * 0.22;
+        let hillMask = 1.0 - Math.min(dist / hillRadius, 1.0);
+        hillMask = hillMask * hillMask * (3.0 - 2.0 * hillMask);
+
+        // Break the circular shape a bit so it feels part of the terrain
+        const hillWarp = shapeNoise(x * 0.018, z * 0.018) * 0.5 + 0.5;
+        const hillStrength = THREE.MathUtils.lerp(0.75, 1.15, hillWarp);
+
+        y += hillMask * amplitude * 2.2 * hillStrength;
+
+        // Add some extra shaping on the hill itself so it doesn't look like a dome
+        const upperHillNoise = detailNoise(
+            (x + 100.0) * frequency * 1.5,
+            (z - 60.0)  * frequency * 1.5
+        ) * amplitude * 0.4;
+        y += upperHillNoise * hillMask;
+
+        // Quantize terrain heights
         const levels = 8;
         y = Math.round(y * levels) / levels;
 
         heights[i] = y;
-    }
 
-    // Find the peak height at the launcher position from the first pass
-    let closestDist = Infinity;
-    let peakY       = 0;
-    for (let i = 0; i < count; i++) {
-        const vx   = geometry.attributes.position.getX(i);
-        const vz   = geometry.attributes.position.getZ(i);
-        const dist = Math.sqrt((vx - launcherPosition.x) ** 2 + (vz - launcherPosition.z) ** 2);
-        if (dist < closestDist) {
-            closestDist = dist;
-            peakY       = heights[i];
+        // Instead of picking the closest point to launcherPosition,
+        // search for the highest point in a local area around it.
+        if (dist <= PEAK_SEARCH_RADIUS && y > peakY) {
+            peakY = y;
+            peakIndex = i;
         }
     }
 
-    // Second pass: apply heights and carve a flat disc at the launcher peak
-    // The disc is at the natural hill peak so it blends seamlessly with the terrain
-    for (let i = 0; i < count; i++) {
-        const vx   = geometry.attributes.position.getX(i);
-        const vz   = geometry.attributes.position.getZ(i);
-        const dist = Math.sqrt((vx - launcherPosition.x) ** 2 + (vz - launcherPosition.z) ** 2);
-
-        // Inside plateau radius: snap to peak height for a perfectly flat surface
-        const y = dist < PLATEAU_RADIUS ? peakY : heights[i];
-        geometry.attributes.position.setY(i, y);
+    // Fallback, in case search radius somehow finds nothing
+    if (peakY === -Infinity) {
+        peakIndex = 0;
+        peakY = heights[0];
+        for (let i = 1; i < count; i++) {
+            if (heights[i] > peakY) {
+                peakY = heights[i];
+                peakIndex = i;
+            }
+        }
     }
 
-    // We need to compute new normals or lighting will be messed up
+
+    // This becomes the true top of the launcher hill
+    const peakX = geometry.attributes.position.getX(peakIndex);
+    const peakZ = geometry.attributes.position.getZ(peakIndex);
+    const plateauCenter = new THREE.Vector3(peakX, peakY, peakZ);
+
+    for (let i = 0; i < count; i++) {
+        const x = geometry.attributes.position.getX(i);
+        const z = geometry.attributes.position.getZ(i);
+        const dist = Math.hypot(x - plateauCenter.x, z - plateauCenter.z);
+
+        let y = heights[i];
+
+        // Flat pad exactly on the actual top part of the hill
+        if (dist < PLATEAU_RADIUS) {
+            y = peakY;
+        }
+        // Soft blend ring around the pad
+        else if (dist < PLATEAU_RADIUS + PLATEAU_BLEND_RADIUS) {
+            const t = (dist - PLATEAU_RADIUS) / PLATEAU_BLEND_RADIUS;
+            const smooth = t * t * (3 - 2 * t);
+            y = THREE.MathUtils.lerp(peakY, heights[i], smooth);
+        }
+
+        geometry.attributes.position.setY(i, y);
+        heights[i] = y;
+    }
+
+
     geometry.attributes.position.needsUpdate = true;
     geometry.computeVertexNormals();
 
-    // Return launcher spawn at the actual terrain peak so placement is accurate
-    const launcherSpawn = new THREE.Vector3(launcherPosition.x, peakY, launcherPosition.z);
+    // Final launcher spawn is now exactly on the seamless plateau center
+    const launcherSpawn = new THREE.Vector3(
+        plateauCenter.x,
+        peakY,
+        plateauCenter.z
+    );
 
     return { terrain, navMap, launcherSpawn };
 }
 
 
 // Let's place some trees on the map, otherwise it will be too empty!
-export async function placeTrees(scene, terrain, terrainSize, treeModels, treeScale, threshold, navigationMap) {
-
-    const gradientMap = createToonGradientMap();
-
+export async function placeTrees(
+    scene,
+    terrain,
+    terrainSize,
+    treeModels,
+    treeScale,
+    threshold,
+    navigationMap,
+    launcherSpawn = new THREE.Vector3(terrainSize * 0.35, 0, terrainSize * 0.35)
+) {
     const clusterNoise = createNoise2D();
     const detailNoise  = createNoise2D();
 
     // We will place the trees' models on the vertices of the terrain.
     const positions = terrain.geometry.attributes.position;
-    const colors    = terrain.geometry.attributes.color;
+
+    // Keep a safe radius around the launcher where we won't place trees so gameplay stays possible
+    const launcherSafeRadius = 24;
 
     for (let i = 0; i < positions.count; i++) {
         let x = positions.getX(i);
         let y = positions.getY(i) - 0.1;
         let z = positions.getZ(i);
 
+        // Use two noise layers to avoid a too uniform distribution
         let cluster  = clusterNoise(x * 0.005, z * 0.005);
-        let detail   = detailNoise(x * 0.05,   z * 0.05);
-        let combined = (cluster * detail + 1) / 2;  // So we get values from 0 to 1
+        let detail   = detailNoise(x * 0.05,  z * 0.05);
+        let combined = (cluster * detail + 1) / 2;
 
         // Bias tree placement toward edges to hide map boundaries
-        // Power of 2 keeps the center natural, edges dense
         const edgeDistX = Math.abs(x) / (terrainSize / 2);
         const edgeDistZ = Math.abs(z) / (terrainSize / 2);
-        const edgeBias  = Math.pow(Math.max(edgeDistX, edgeDistZ), 80);
-        combined       += edgeBias * 0.5;
+        const edgeBias  = Math.pow(Math.max(edgeDistX, edgeDistZ), 8);
+        combined       += edgeBias * 0.35;
 
         if (combined < threshold) continue;
 
-        // We set this part of the navmap as not navigable
-        // The tree won't exactly be there (because of the jitter offset we will add later), but will be close enough
-        navigationMap.setBlocked(x, z);
+        const distToLauncher = Math.hypot(
+            x - launcherSpawn.x,
+            z - launcherSpawn.z
+        );
 
-        // Small random jitter so trees don't sit exactly on grid points
+        // Don't let trees spawn too close to the launcher
+        if (distToLauncher < launcherSafeRadius) continue;
+
+        // Add a bit of random offset so trees don't sit exactly on the grid
         let jitterX = (Math.random() - 0.5) * 10;
         let jitterZ = (Math.random() - 0.5) * 10;
 
-        const modelIndex = Math.floor(Math.random() * treeModels.length);
-        let model        = treeModels[modelIndex];
-        let tree         = model.clone();
-        tree.castShadow  = true;
+        // Clamp so trees don't get pushed outside the map
+        let treeX = Math.max(-terrainSize / 2, Math.min(terrainSize / 2, x + jitterX));
+        let treeZ = Math.max(-terrainSize / 2, Math.min(terrainSize / 2, z + jitterZ));
 
-        // Apply the matching material for this tree type
+        // After jitter, make sure the actual placed tree is still outside the safe zone
+        const jitteredDistToLauncher = Math.hypot(
+            treeX - launcherSpawn.x,
+            treeZ - launcherSpawn.z
+        );
+
+        if (jitteredDistToLauncher < launcherSafeRadius) continue;
+
+        // Pick one of our tree variants
+        const modelIndex   = Math.floor(Math.random() * treeModels.length);
         const treeMaterial = treeMaterials[modelIndex];
+        let model          = treeModels[modelIndex];
+        let tree           = model.clone();
+
+        tree.castShadow = true;
+        // Apply the correct material to the cloned tree
         tree.traverse((obj) => {
             if (obj.isMesh) {
                 obj.material = treeMaterial;
-                obj.geometry.setAttribute('uv2', obj.geometry.attributes.uv);
+                if (obj.geometry.attributes.uv && !obj.geometry.attributes.uv2) {
+                    obj.geometry.setAttribute('uv2', obj.geometry.attributes.uv);
+                }
             }
         });
 
-        // Make sure we aren't placing trees into the void after applying jitter: let's clamp
-        let treeX = Math.max(-terrainSize/2, Math.min(terrainSize/2, x + jitterX));
-        let treeZ = Math.max(-terrainSize/2, Math.min(terrainSize/2, z + jitterZ));
 
         tree.position.set(treeX, y, treeZ);
         tree.rotation.y = Math.random() * Math.PI * 2;
 
+
         // Let's have some variation in size of trees
-        // Minimum size is 0.7, maximum size is 0.7 + 1.0 * 0.8 = 1.5
         const randomScale = treeScale * (0.7 + Math.random() * 0.8);
         tree.scale.setScalar(randomScale);
 
+
         scene.add(tree);
+        // Mark the actual placed tree position as blocked for navigation
+        navigationMap.setBlocked(treeX, treeZ);
     }
 }

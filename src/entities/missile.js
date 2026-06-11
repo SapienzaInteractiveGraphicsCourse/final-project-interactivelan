@@ -60,10 +60,12 @@ export class Missile {
 
             if (intersections.length > 0) {
                 const hit = intersections[0];
+
                 this.position.copy(hit.point);
                 this.mesh.position.copy(this.position);
-                this.destroy(scene);
+
                 spawnExplosion(scene, hit.point.clone(), 12, 0.8);
+                this.destroy(scene);
                 return true;
             }
         }

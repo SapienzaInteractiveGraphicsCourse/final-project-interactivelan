@@ -18,10 +18,12 @@ export const LauncherState = Object.freeze({
 
 // Our class handling the main part of the game: the Launcher
 export class Launcher {
-    constructor(model) {
+    constructor(model, worldObastacles = []) {
         this.model = model;
         // Launcher starts as ready to fire
         this.state = LauncherState.READY;
+
+        this.worldObastacles = worldObastacles;
 
         // Transform properties
         this.position = new THREE.Vector3(0, 0, 0);
@@ -394,7 +396,7 @@ export class Launcher {
         // Update missile if in flight
         if (this.missile && this.missile.alive) {
             const target = this.getSightTarget(scene);
-            const hit    = this.missile.update(delta, target, this.tanks, scene);
+            const hit    = this.missile.update(delta, target, this.tanks, this.worldObastacles, scene);
             if (hit || !this.missile.alive) {
                 this.missile = null;
                 this.state   = LauncherState.POST_FIRE;

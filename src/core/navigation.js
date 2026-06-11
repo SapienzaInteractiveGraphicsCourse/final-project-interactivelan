@@ -26,6 +26,12 @@ export class NavigationMap{
             }))
         );
     }
+    // Convert a world position to a unique string key for its grid cell
+    // Used by protected corridors and scatter placement to identify cells in Sets
+    cellKey(x, z) {
+        const [gridX, gridZ] = this.worldToGrid(x, z);
+        return `${gridX},${gridZ}`;
+    }
 
     // Covert world position to grid position
     worldToGrid(x, z) {
@@ -98,13 +104,16 @@ export class NavigationMap{
         return meshes;
     }
     
-// Visualize a path on the scene, so that I can debug it 
-    visualizePath(scene, path) {
-        // A path should exist before I can visualize it.
-        if (path.length === 0) return;
+    // Visualize a path on the scene, so that I can debug it 
+    // Use real heights
+    visualizePath(scene, path, terrain = null) {
+        if (!path || path.length === 0) return;
 
-        // Map our path points to 3D vectors, slightly above terrain so they are visible
-        const points = path.map(p => new THREE.Vector3(p.x, 20, p.z));
+        const points = path.map((p) => {
+            const y = terrain ? terrain.getHeightAt(p.x, p.z) + 2 : 2;
+            return new THREE.Vector3(p.x, y, p.z);
+        });
+
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const material = new THREE.LineBasicMaterial({ color: 0xffff00 });
         const line = new THREE.Line(geometry, material);
@@ -115,82 +124,98 @@ export class NavigationMap{
     // A generic A* pathfinding algorithm
     // Takes world coordinates and returns an array of world positions {x, z} to follow
     // Returns empty array if no path is found
-    findPath(startX, startZ, goalX, goalZ) {
-        const [startGX, startGZ] = this.worldToGrid(startX, startZ);
-        const [goalGX,  goalGZ]  = this.worldToGrid(goalX,  goalZ);
+    findPath(start, goal) {
+        if (
+            // In short, if we receive an incorrect input
+            !start || !goal ||
+            typeof start.x !== 'number' || typeof start.z !== 'number' ||
+            typeof goal.x !== 'number' || typeof goal.z !== 'number' ||
+            Number.isNaN(start.x) || Number.isNaN(start.z) ||
+            Number.isNaN(goal.x) || Number.isNaN(goal.z)
+        ) {
+            console.error('NavigationMap.findPath: invalid start/goal vectors', { start, goal });
+            return [];
+        }
 
-        // We need to track which cells we still need to explore (open) and which we already visited (closed)
-        const openSet   = [];
+        const [startGX, startGZ] = this.worldToGrid(start.x, start.z);
+        const [goalGX, goalGZ] = this.worldToGrid(goal.x, goal.z);
+
+        // Start or goal outside map bounds
+        if (
+            startGX < 0 || startGX >= this.width ||
+            startGZ < 0 || startGZ >= this.height ||
+            goalGX < 0 || goalGX >= this.width ||
+            goalGZ < 0 || goalGZ >= this.height
+        ) {
+            return [];
+        }
+
+        // Start or goal blocked
+        if (!this.grid[startGX][startGZ].passable || !this.grid[goalGX][goalGZ].passable) {
+            return [];
+        }
+
+        const openSet = [];
         const closedSet = new Set();
-        const cameFrom  = new Map();
+        const cameFrom = new Map();
 
-        // gCost = actual distance from start
-        // fCost = gCost + estimated distance to goal
         const gCost = new Map();
         const fCost = new Map();
 
-        // Helper inline to convert grid coordinates to a unique string key for our maps
-        const key   = (gx, gz) => `${gx},${gz}`;
-        // We use euclidean distance as our heuristic (straight line to goal basically)
-        const hCost = (gx, gz) => Math.sqrt(Math.pow(gx - goalGX, 2) + Math.pow(gz - goalGZ, 2));
+        const key = (gx, gz) => `${gx},${gz}`;
+        const hCost = (gx, gz) => Math.hypot(gx - goalGX, gz - goalGZ);
 
-        // Initialize with start node
         gCost.set(key(startGX, startGZ), 0);
         fCost.set(key(startGX, startGZ), hCost(startGX, startGZ));
         openSet.push({ gx: startGX, gz: startGZ });
 
         while (openSet.length > 0) {
-            // Always process the node with the lowest fCost first
-            openSet.sort((a, b) => fCost.get(key(a.gx, a.gz)) - fCost.get(key(b.gx, b.gz)));
+            openSet.sort(
+                (a, b) => fCost.get(key(a.gx, a.gz)) - fCost.get(key(b.gx, b.gz))
+            );
+
             const current = openSet.shift();
             const currentKey = key(current.gx, current.gz);
 
-            // We reached the goal!
-            // Reconstruct the path by following cameFrom back to start
+            // Reached goal: rebuild world-space path
             if (current.gx === goalGX && current.gz === goalGZ) {
                 const path = [];
-                let node = currentKey;
-                while (node) {
-                    const [gx, gz] = node.split(',').map(Number);
+                let nodeKey = currentKey;
+
+                while (nodeKey) {
+                    const [gx, gz] = nodeKey.split(',').map(Number);
                     const [wx, wz] = this.gridToWorld(gx, gz);
                     path.unshift({ x: wx, z: wz });
-                    node = cameFrom.get(node);
+                    nodeKey = cameFrom.get(nodeKey);
                 }
+
                 return path;
             }
 
             closedSet.add(currentKey);
 
-            // Check all 8 neighbours (4 sides + diagonal)
             for (let dx = -1; dx <= 1; dx++) {
                 for (let dz = -1; dz <= 1; dz++) {
                     if (dx === 0 && dz === 0) continue;
 
-                    // Neighbour's grid X and Z
                     const nx = current.gx + dx;
                     const nz = current.gz + dz;
-                    // Convert coordinates to a astring, so that we can use it as key in the Map and Set
-                    const nKey = key(nx, nz);
+                    const neighborKey = key(nx, nz);
 
-                    // Skip out of bounds, blocked cells, and already visited ones
-                    if (nx < 0 || nx >= this.width)  continue;
+                    if (nx < 0 || nx >= this.width) continue;
                     if (nz < 0 || nz >= this.height) continue;
-                    if (!this.grid[nx][nz].passable)  continue;
-                    if (closedSet.has(nKey))           continue;
+                    if (!this.grid[nx][nz].passable) continue;
+                    if (closedSet.has(neighborKey)) continue;
 
-                    // Diagonal movement costs more than straight (Pythagoras theorem!)
-                    const moveCost = (dx !== 0 && dz !== 0) ? 1.414 : 1;
-                    // Candidate cost for reaching the neighbor
+                    const moveCost = (dx !== 0 && dz !== 0) ? Math.SQRT2 : 1;
                     const tentativeG = gCost.get(currentKey) + moveCost;
 
-                    // Check if tentative route is cheaper than others we have found previously
-                    if (tentativeG < (gCost.get(nKey) ?? Infinity)) {
-                        cameFrom.set(nKey, currentKey);
-                        gCost.set(nKey, tentativeG);
-                        fCost.set(nKey, tentativeG + hCost(nx, nz));
+                    if (tentativeG < (gCost.get(neighborKey) ?? Infinity)) {
+                        cameFrom.set(neighborKey, currentKey);
+                        gCost.set(neighborKey, tentativeG);
+                        fCost.set(neighborKey, tentativeG + hCost(nx, nz));
 
-                        // Check if already in openset before adding it
-                        if (!openSet.find(n => n.gx === nx && n.gz === nz)) {
+                        if (!openSet.find((node) => node.gx === nx && node.gz === nz)) {
                             openSet.push({ gx: nx, gz: nz });
                         }
                     }
@@ -198,7 +223,6 @@ export class NavigationMap{
             }
         }
 
-        // No path found, likely there isn't a path from start to goal
         return [];
     }
 }

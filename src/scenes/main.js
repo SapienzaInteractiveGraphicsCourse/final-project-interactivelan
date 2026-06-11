@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { loadModel, loadTreeModels } from '../utilities/loader.js';
 
@@ -41,12 +40,6 @@ window.camera = camera;
 
 // Timing
 let lastTime = performance.now();
-
-
-// Controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
 
 
 // Lighting
@@ -146,6 +139,7 @@ function addTank(position) {
     return tank;
 }
 
+
 // Add a little sphere to help me debug
 function addSpawnMarker(position, color, radius = 2.5) {
     const marker = new THREE.Mesh(
@@ -182,36 +176,14 @@ function visualizeDebugSpawns() {
     }
 }
 
-function setupCamera() {
-    const launcherPos = new THREE.Vector3();
-    launcher.group.getWorldPosition(launcherPos);
-
-    const bounds = new THREE.Box3().setFromObject(launcherModel);
-    const size = new THREE.Vector3();
-    bounds.getSize(size);
-
-    const maxDim = Math.max(size.x, size.y, size.z);
-
-    camera.position.set(
-        launcherPos.x,
-        launcherPos.y + maxDim,
-        launcherPos.z + maxDim * 2
-    );
-
-    camera.lookAt(launcherPos);
-    controls.target.copy(launcherPos);
-}
-
-
 // Init
 async function init() {
     terrain.addToScene(scene);
     terrain.terrain.updateMatrixWorld(true);
 
     launcher.addToScene(scene, terrain.launcherSpawn);
-    launcher.setMainCamera(camera);
-
-    setupCamera();
+    launcher.faceToward(new THREE.Vector3(0, 0, 0));
+    launcher.setMainCamera();
 
     // Add a tank for each spawnpoint
     for (const spawn of terrain.enemySpawnPositions) {
@@ -238,7 +210,6 @@ function animate() {
         tank.update(delta, launcher.activeCamera ?? camera);
     }
 
-    controls.update();
     updateExplosions(delta);
 
     renderer.render(scene, launcher.activeCamera ?? camera);

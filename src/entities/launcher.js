@@ -25,15 +25,20 @@ export class Launcher {
 
         this.worldObastacles = worldObastacles;
 
+        // Start freeloocking with the launcher when clicking on the canvas
+        this.onCanvasClick = this.onCanvasClick.bind(this);
+
         // Transform properties
         this.position = new THREE.Vector3(0, 0, 0);
         this.rotation = new THREE.Euler(0, 0, 0);
         this.scale    = new THREE.Vector3(1, 1, 1);
 
         // Cameras references and state
-        this.mainCamera = null;
-        this.activeCam  = null;
-        this.scene      = null;
+        this.mainCamera       = null;
+        this.activeCam        = null;
+        this.scene            = null;
+        this.operatorCamera   = null;
+        this.operatorCamPivot = null;
 
         // Rotation speeds and pitch limits
         // Hardcoded for now, we'll se in the future
@@ -41,6 +46,12 @@ export class Launcher {
         this.PITCH_SPEED = 0.8;
         this.PITCH_MIN   = -0.5;
         this.PITCH_MAX   = 0.3;
+
+        // Restrict aiming to 180 degrees arc in front
+        // Set by faceToward so they're always relative to the launcher's spawn orientation
+        this.YAW_MIN = -Math.PI / 2;
+        this.YAW_MAX =  Math.PI / 2;
+        this.yawOrigin = 0; // set by faceToward
 
         // Mouse aim sensitivity
         this.MOUSE_SENS_X = 0.0010;
@@ -145,6 +156,7 @@ export class Launcher {
         document.addEventListener('mouseup', this.onMouseUp);
         document.addEventListener('contextmenu', this.onContextMenu);
         document.addEventListener('pointerlockchange', this.onPointerLockChange);
+        document.addEventListener('click', this.onCanvasClick);
 
         // Initialize the UI immediately
         this.initUI();
@@ -183,12 +195,20 @@ export class Launcher {
 
     // Move aim with mouse while scoped in
     onMouseMove(event) {
-        if (!this.isAiming || !this.isPointerLocked) return;
+        if (!this.isPointerLocked) return;
 
-        this.yaw   -= event.movementX * this.MOUSE_SENS_X;
-        this.pitch -= event.movementY * this.MOUSE_SENS_Y;
+        // In both camera modes, mouse X rotates the launcher yaw so the camera and the launcher always stay in sync
+        this.yaw -= event.movementX * this.MOUSE_SENS_X;
+        this.yaw  = THREE.MathUtils.clamp(
+            this.yaw,
+            this.yawOrigin + this.YAW_MIN,
+            this.yawOrigin + this.YAW_MAX
+        );
 
-        this.pitch = Math.max(this.PITCH_MIN, Math.min(this.PITCH_MAX, this.pitch));
+    // Pitch controls launcher elevation in both modes
+    this.pitch -= event.movementY * this.MOUSE_SENS_Y;
+    this.pitch  = THREE.MathUtils.clamp(this.pitch, this.PITCH_MIN, this.PITCH_MAX);
+
     }
 
     // Left click fires, right click toggles scope
@@ -230,6 +250,14 @@ export class Launcher {
         }
     }
 
+    // Lock pointer on canvas click when not scoped
+    // This lets the player rotate the camera without holding a button
+    onCanvasClick() {
+        if (!this.isAiming && !this.isPointerLocked) {
+            document.body.requestPointerLock();
+        }
+    }
+
     // We set the aiming state and add overlay
     enterAimMode() {
         this.isAiming = true;
@@ -248,9 +276,8 @@ export class Launcher {
             this.crosshairElement.style.visibility = 'hidden';
         }
 
-        if (document.pointerLockElement) {
-            document.exitPointerLock();
-        }
+        // Keep pointer lock active when leaving scoped view so the player can continue moving the launcher immediately in third-person.
+        // Having to left click again isn't that nice
     }
 
     // Switch camera between main and launcher
@@ -270,10 +297,14 @@ export class Launcher {
         }
     }
 
-    // Self explainatory
+    // Self explanatory
     setMainCamera(camera) {
-        this.mainCamera = camera;
-        this.activeCam  = camera;
+        if (camera) {
+            this.mainCamera = camera;
+        } else if (this.operatorCamera) {
+            this.mainCamera = this.operatorCamera;
+        }
+        this.activeCam = this.mainCamera;
     }
 
     // Return active camera
@@ -283,6 +314,10 @@ export class Launcher {
 
     // If we resize window while scoped in, make sure the camera isn't stretched or squished
     onResize() {
+        if (this.mainCamera) {
+            this.mainCamera.aspect = window.innerWidth / window.innerHeight;
+            this.mainCamera.updateProjectionMatrix();
+        }
         if (this.sightCamera) {
             this.sightCamera.aspect = window.innerWidth / window.innerHeight;
             this.sightCamera.updateProjectionMatrix();
@@ -315,10 +350,15 @@ export class Launcher {
 
         // Bone aiming
         if (this.middleBone) {
-            if (!this.isAiming || !this.isPointerLocked) {
-                if (input.isDown('ArrowLeft'))  this.yaw += this.YAW_SPEED * delta;
-                if (input.isDown('ArrowRight')) this.yaw -= this.YAW_SPEED * delta;
-            }
+            if (input.isDown('ArrowLeft'))  this.yaw += this.YAW_SPEED * delta;
+            if (input.isDown('ArrowRight')) this.yaw -= this.YAW_SPEED * delta;
+
+            this.yaw = THREE.MathUtils.clamp(
+                this.yaw,
+                this.yawOrigin + this.YAW_MIN,
+                this.yawOrigin + this.YAW_MAX
+            );
+
             this.middleBone.rotation.y = this.yaw;
         }
 
@@ -432,6 +472,22 @@ export class Launcher {
         // Sync group to that transform
         this.group.position.copy(this.position);
 
+        // Capture the tube's rest pose world transform once after placement
+        // Used by tossTube to compute the delta between rest and current aim
+        this.group.updateMatrixWorld(true);
+
+        this.boneRestWorldPos  = new THREE.Vector3();
+        this.boneRestWorldQuat = new THREE.Quaternion();
+        this.missileBone.getWorldPosition(this.boneRestWorldPos);
+        this.missileBone.getWorldQuaternion(this.boneRestWorldQuat);
+
+        this.tubeRestWorldPos   = new THREE.Vector3();
+        this.tubeRestWorldQuat  = new THREE.Quaternion();
+        this.tubeRestWorldScale = new THREE.Vector3();
+        this.tubeMesh.getWorldPosition(this.tubeRestWorldPos);
+        this.tubeMesh.getWorldQuaternion(this.tubeRestWorldQuat);
+        this.tubeMesh.getWorldScale(this.tubeRestWorldScale);
+
         // Sight camera is parented to Launcher bone, moves with it
         // It has a small FOV since it's supposed to be a telescopic sight
         if (this.sightBone) {
@@ -452,7 +508,28 @@ export class Launcher {
             // Add to scene first, then add it to bone hierarchy
             scene.add(this.sightCamera);
             this.sightBone.add(this.sightCamera);
+
+            // Distance and height the free-look camera sits behind the launcher
+            this.freeLookDistance = 20;
+            this.freeLookHeight   = 8;
         }
+
+        // Create the default operator camera in first-person, parented to the launcher bone
+        const cameraParent = this.launcherBone || this.group;
+        this.operatorCamPivot = new THREE.Object3D();
+        this.operatorCamPivot.position.set(0, 1.2, 3);
+        this.operatorCamera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        // Very trial and error numbers
+        this.operatorCamera.position.set(0.5, -0.7, -1.75);
+        cameraParent.add(this.operatorCamPivot);
+        this.operatorCamPivot.add(this.operatorCamera);
+        this.mainCamera = this.operatorCamera;
+        this.activeCam  = this.operatorCamera;
 
         // Permanent marker to read tube world transform reliably
         // Hopefully will fix our tube toss
@@ -504,6 +581,20 @@ export class Launcher {
         return targetPoint;
     }
 
+    // Point the launcher toward a world position on spawn
+    // Sets the base yaw so the operator faces the right way from the start
+    faceToward(targetPosition) {
+        const direction = new THREE.Vector3(
+            targetPosition.x - this.position.x,
+            0,
+            targetPosition.z - this.position.z
+        ).normalize();
+
+        // + PI because the launcher model's forward is flipped in Blender vs Three.js
+        this.yaw       = Math.atan2(direction.x, direction.z) + Math.PI;
+        this.yawOrigin = this.yaw;
+    }
+
     // Missile is fired
     fire(scene) {
         if (this.state !== LauncherState.READY) return;
@@ -544,41 +635,47 @@ export class Launcher {
 
     // After firing, the tube is tossed to the side (like the real life counterpart)
     tossTube(scene) {
-        // Make sure we have our tubeMesh loaded
-        if (!this.tubeMesh) return null;
-        if (!this.middleBone) return null;
+        if (!this.tubeMesh || !this.missileBone) return null;
 
-        // Make sure out matrix is updated
+        // Make sure bone matrices reflect the current aim before reading them
         this.group.updateMatrixWorld(true);
 
-        const worldPos  = new THREE.Vector3();
-        const worldQuat = new THREE.Quaternion();
+        const boneCurrentPos  = new THREE.Vector3();
+        const boneCurrentQuat = new THREE.Quaternion();
+        this.missileBone.getWorldPosition(boneCurrentPos);
+        this.missileBone.getWorldQuaternion(boneCurrentQuat);
 
-        this.tubeMesh.getWorldPosition(worldPos);
-        this.tubeMesh.getWorldQuaternion(worldQuat);
+        // Delta rotation between rest pose and current aim
+        // Applying this to anything captured at rest moves it to the current aim
+        const deltaRotation = boneCurrentQuat.clone().multiply(
+            this.boneRestWorldQuat.clone().invert()
+        );
 
-        // Generate new mesh for our tossed tube
+        // Rotate the rest offset (tube origin relative to bone) by the delta,
+        // then add to where the bone sits now
+        const restOffset = this.tubeRestWorldPos.clone().sub(this.boneRestWorldPos);
+        const spawnPos   = boneCurrentPos.clone().add(restOffset.applyQuaternion(deltaRotation));
+
+        // Rest orientation rotated by the same delta
+        const spawnQuat = deltaRotation.clone().multiply(this.tubeRestWorldQuat);
+
         this.looseTubeMesh = new THREE.Mesh(
             this.tubeMesh.geometry.clone(),
             this.tubeMesh.material
         );
+        this.looseTubeMesh.position.copy(spawnPos);
+        this.looseTubeMesh.quaternion.copy(spawnQuat);
+        this.looseTubeMesh.scale.copy(this.tubeRestWorldScale);
 
-        this.looseTubeMesh.position.copy(worldPos);
-        this.looseTubeMesh.quaternion.copy(worldQuat);
-
-        // Add to scene tossed tube, hide original one
         scene.add(this.looseTubeMesh);
         this.tubeMesh.visible = false;
 
-        // Apply throw velocity
-        const localVelocity = new THREE.Vector3(-2.5, 2, 0);
-        const worldVelocity = localVelocity.applyQuaternion(
-            this.middleBone.getWorldQuaternion(new THREE.Quaternion())
-        );
+        // Toss direction expressed in rest frame, rotated into current aim by the same delta
+        // So the tube always flies to the launcher's left regardless of yaw
+        const worldVelocity = new THREE.Vector3(-2.5, 2, 0).applyQuaternion(deltaRotation);
 
-        // Return trown tube mesh and velocity
         return {
-            mesh: this.looseTubeMesh,
+            mesh:     this.looseTubeMesh,
             velocity: worldVelocity,
         };
     }

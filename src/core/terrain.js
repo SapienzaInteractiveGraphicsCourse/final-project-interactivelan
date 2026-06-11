@@ -41,6 +41,12 @@ export class Terrain {
         // Cells tanks cannot walk over
         this.protectedCells = null;
 
+        // Some gameplay values for our launcher placement
+        this.MIN_LAUNCHER_ENEMY_DISTANCE = 150;
+        this.LAUNCHER_SEARCH_RADIUS = 70;
+        this.LAUNCHER_CANDIDATE_COUNT = 120;
+        this.LAUNCHER_EDGE_MARGIN = 20;
+
         // Create the plane itself, rotate it so it's flat on the ground
         this.geometry = new THREE.PlaneGeometry(size, size, segments, segments);
         this.geometry.rotateX(-Math.PI / 2);
@@ -77,49 +83,37 @@ export class Terrain {
         this.geometry.attributes.position.needsUpdate = true;
         this.geometry.computeVertexNormals();
 
-        // Adjust launcher to terrain height
-        this.launcherSpawn = new THREE.Vector3(
-            this.launcherPosition.x,
-            this.getHeightAt(this.launcherPosition.x, this.launcherPosition.z),
-            this.launcherPosition.z
-        );
+        this.blockSteepCells();
 
-        // Adjust enemy spawn positions to terrain height
+        // Adjust enemy spawn positions to terrain height first
         this.enemySpawns = this.enemySpawnPositions.map((spawn) => new THREE.Vector3(
             spawn.x,
             this.getHeightAt(spawn.x, spawn.z),
             spawn.z
         ));
 
-        // If you want enemySpawnPositions itself to now mean "adjusted positions",
-        // overwrite it with the corrected values
         this.enemySpawnPositions = this.enemySpawns.map((spawn) => spawn.clone());
 
+        // Find a better launcher spawn than the raw input
+        this.launcherSpawn = this.findSuitableLauncherSpawn(this.launcherPosition);
+
         // Compute our protected cells after terrain generation
-        this.blockSteepCells();
         this.protectedCells = this.computeProtectedCells();
     }
 
     // Block off terrain cells that are steeper than a certain amount for navigation
-    // This should avoid mountain goat tanks
     blockSteepCells(maxClimb = 4) {
         const verticesPerRow = this.segments + 1;
         const half = this.size / 2;
 
-        // Iterate over every cell
         for (let row = 0; row < this.segments; row++) {
             for (let col = 0; col < this.segments; col++) {
-                // Index of top-left vertex of cell in the heights array
                 const i = row * verticesPerRow + col;
-
-                // Height at that vertex
                 const y = this.heights[i];
 
-                // Height difference between this vertex and its right/down neighbors
                 const dRight = Math.abs(this.heights[i + 1] - y);
                 const dDown = Math.abs(this.heights[i + verticesPerRow] - y);
 
-                // Height difference between this vertex and the vertex directly below it in the next row
                 if (dRight > maxClimb || dDown > maxClimb) {
                     const x = -half + col * this.cellSize;
                     const z = -half + row * this.cellSize;
@@ -129,11 +123,10 @@ export class Terrain {
         }
     }
 
+    // We want to make sure we leave corridors from spawners to launcher open and without trees and clutter
     computeProtectedCells(corridorRadius = 8) {
-        // A Set is reasonable since we will put at most a cell one time in it
         const protectedCells = new Set();
 
-        // For each enemy spawn, find a path to the launcher
         for (const spawn of this.enemySpawnPositions) {
             const path = this.navMap.findPath(spawn, this.launcherSpawn);
 
@@ -141,8 +134,6 @@ export class Terrain {
                 return null;
             }
 
-            // Protect a corridor around the entire path,
-            // so that we won't have trees or other props blocking the way
             for (const point of path) {
                 for (let dx = -corridorRadius; dx <= corridorRadius; dx += this.cellSize) {
                     for (let dz = -corridorRadius; dz <= corridorRadius; dz += this.cellSize) {
@@ -163,7 +154,6 @@ export class Terrain {
         const halfSize = this.size / 2;
         const verticesPerRow = this.segments + 1;
 
-        // First thing, let's map world coordinates to grid coordinates
         const gridX = THREE.MathUtils.clamp(
             (x + halfSize) / this.cellSize,
             0,
@@ -175,26 +165,162 @@ export class Terrain {
             this.segments - 0.001
         );
 
-        // Let's find the bottom left corner of the grid cell that contains x,z
         const baseX = Math.floor(gridX);
         const baseZ = Math.floor(gridZ);
 
-        // Find local position inside said cell
         const localX = gridX - baseX;
         const localZ = gridZ - baseZ;
 
-        // Read the cell's four corners' heights
         const topLeft = this.heights[baseZ * verticesPerRow + baseX];
         const topRight = this.heights[baseZ * verticesPerRow + baseX + 1];
         const bottomLeft = this.heights[(baseZ + 1) * verticesPerRow + baseX];
         const bottomRight = this.heights[(baseZ + 1) * verticesPerRow + baseX + 1];
 
-        // Interpolate along x for each edge
         const topEdgeHeight = THREE.MathUtils.lerp(topLeft, topRight, localX);
         const bottomEdgeHeight = THREE.MathUtils.lerp(bottomLeft, bottomRight, localX);
 
-        // Interpolate along z between the two edges
         return THREE.MathUtils.lerp(topEdgeHeight, bottomEdgeHeight, localZ);
+    }
+
+    // Check if a position is in bounds
+    isInsideBounds(x, z, margin = 0) {
+        const half = this.size / 2;
+        return (
+            x >= -half + margin &&
+            x <= half - margin &&
+            z >= -half + margin &&
+            z <= half - margin
+        );
+    }
+
+    // Self explainatory
+    isFarEnoughFromEnemySpawns(point) {
+        for (const spawn of this.enemySpawnPositions) {
+            if (point.distanceTo(spawn) < this.MIN_LAUNCHER_ENEMY_DISTANCE) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Score how good a launcher position is
+    evaluateLauncherCandidate(x, z) {
+        // Don't place it too close to the edges
+        if (!this.isInsideBounds(x, z, this.LAUNCHER_EDGE_MARGIN)) {
+            return -Infinity;
+        }
+
+        // Must be on passable terrain
+        if (!this.navMap.isPassable(x, z)) {
+            return -Infinity;
+        }
+
+        // Get the height at the candidate position
+        const centerY = this.getHeightAt(x, z);
+        const center = new THREE.Vector3(x, centerY, z);
+
+        // Keep it far enough from enemy spawns
+        if (!this.isFarEnoughFromEnemySpawns(center)) {
+            return -Infinity;
+        }
+
+        // Sample the ground around the point
+        const offsets = [
+            [8, 0], [-8, 0],
+            [0, 8], [0, -8],
+            [6, 6], [-6, 6],
+            [6, -6], [-6, -6],
+        ];
+
+        let minY = centerY;
+        let maxY = centerY;
+        let sumY = 0;
+        let validSamples = 0;
+
+        for (const [dx, dz] of offsets) {
+            const sx = x + dx;
+            const sz = z + dz;
+
+            // Skip samples outside the map
+            if (!this.isInsideBounds(sx, sz, this.LAUNCHER_EDGE_MARGIN)) continue;
+
+            const y = this.getHeightAt(sx, sz);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+            sumY += y;
+            validSamples++;
+        }
+
+        // No valid samples means no score
+        if (validSamples === 0) {
+            return -Infinity;
+        }
+
+        // Measure how flat the area is
+        const avgY = sumY / validSamples;
+        const localRelief = maxY - minY;
+
+        // Penalize bowl-like spots
+        const valleyPenalty = Math.max(0, avgY - centerY);
+
+        // Prefer staying near the intended launcher area
+        const distanceFromHint = new THREE.Vector2(x, z).distanceTo(
+            new THREE.Vector2(this.launcherPosition.x, this.launcherPosition.z)
+        );
+
+        // High ground is good, rough ground is bad
+        let score = 0;
+        score += centerY * 2.0;
+        score -= localRelief * 3.0;
+        score -= valleyPenalty * 8.0;
+        score -= distanceFromHint * 0.05;
+
+        return score;
+    }
+
+    // Search around the original launcher position and choose a better gameplay position
+    // We want to make sure our launcher can actually see the enemies during gameplay
+    findSuitableLauncherSpawn(preferredPosition) {
+        let bestPoint = null;
+        let bestScore = -Infinity;
+
+        const preferredY = this.getHeightAt(preferredPosition.x, preferredPosition.z);
+        const preferredCandidate = new THREE.Vector3(
+            preferredPosition.x,
+            preferredY,
+            preferredPosition.z
+        );
+
+        const preferredScore = this.evaluateLauncherCandidate(
+            preferredCandidate.x,
+            preferredCandidate.z
+        );
+
+        if (preferredScore > bestScore) {
+            bestScore = preferredScore;
+            bestPoint = preferredCandidate;
+        }
+
+        for (let i = 0; i < this.LAUNCHER_CANDIDATE_COUNT; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * this.LAUNCHER_SEARCH_RADIUS;
+
+            const x = preferredPosition.x + Math.cos(angle) * radius;
+            const z = preferredPosition.z + Math.sin(angle) * radius;
+            const score = this.evaluateLauncherCandidate(x, z);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestPoint = new THREE.Vector3(x, this.getHeightAt(x, z), z);
+            }
+        }
+
+        if (!bestPoint) {
+            return preferredCandidate;
+        }
+
+        return bestPoint;
     }
 
     addToScene(scene) {

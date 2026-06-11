@@ -14,10 +14,13 @@ import { createGrass } from '../core/grass.js';
 import { applyCellShading } from '../rendering/shaders.js';
 import { updateExplosions } from '../rendering/effects.js';
 
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
 
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('skyblue');
+//scene.fog = new THREE.Fog(0x87ceeb, 140, 380);
 
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -81,15 +84,15 @@ const treeModels = await loadTreeModels();
 
 // Terrain
 const terrain = new Terrain(
-    300,
+    500,
     120,
     0.005,
     4,
-    new THREE.Vector3(100, 0, 100),
+    new THREE.Vector3(200, 0, 200),
     [
-        new THREE.Vector3(-80, 0, -110),
-        new THREE.Vector3(0, 0, -115),
-        new THREE.Vector3(-115, 0, 0),
+        new THREE.Vector3(-200, 0, -200),
+        new THREE.Vector3(0, 0, -200),
+        new THREE.Vector3(-200, 0, 0),
     ]
 );
 
@@ -116,22 +119,34 @@ function onResize() {
 }
 
 
-// Helpers
+// Helper functions to make this code more legible
+
+// Create a new tank and add it to scene!
 function addTank(position) {
+    // Make sure the spawn lands on a passable cell before doing anything else
+    // If the position is inside a tree's blocked zone the first refreshPath would return []
+    const safeSpawn = terrain.navMap.findNearestPassable(position.x, position.z);
+
     const groundedPosition = new THREE.Vector3(
-        position.x,
-        terrain.getHeightAt(position.x, position.z),
-        position.z
+        safeSpawn.x,
+        terrain.getHeightAt(safeSpawn.x, safeSpawn.z),
+        safeSpawn.z
     );
 
-    const tank = new Tank(tankModel);
+    // SkeletonUtils.clone is required for skinned meshes since model.clone() doesn't copy the skeleton correctly and breaks bone animations on the second tank
+    // The more you know
+    const clonedModel = SkeletonUtils.clone(tankModel);
+    const tank        = new Tank(clonedModel);
+
     tanks.push(tank);
-    tank.addToScene(scene, groundedPosition);
+    tank.addToScene(scene, terrain, groundedPosition);
     launcher.registerTank(tank);
+    tank.setNavigation(terrain.navMap, terrain.launcherSpawn);
 
     return tank;
 }
 
+// Add a little sphere to help me debug
 function addSpawnMarker(position, color, radius = 2.5) {
     const marker = new THREE.Mesh(
         new THREE.SphereGeometry(radius, 12, 12),
@@ -149,6 +164,7 @@ function addSpawnMarker(position, color, radius = 2.5) {
     return marker;
 }
 
+// Show our paths from spawnpoints to player
 function visualizeDebugPaths() {
     for (const spawn of terrain.enemySpawnPositions) {
         const path = terrain.navMap.findPath(spawn, terrain.launcherSpawn);
@@ -159,6 +175,7 @@ function visualizeDebugPaths() {
     }
 }
 
+// Place the little sphere where enemies will spawn
 function visualizeDebugSpawns() {
     for (const spawn of terrain.enemySpawnPositions) {
         addSpawnMarker(spawn, 0xff00ff, 2.5);
@@ -196,10 +213,14 @@ async function init() {
 
     setupCamera();
 
-    addTank(new THREE.Vector3(100, 0, 5));
+    // Add a tank for each spawnpoint
+    for (const spawn of terrain.enemySpawnPositions) {
+        console.log(spawn);
+        addTank(spawn);
+    }
 
-    visualizeDebugSpawns();
-    visualizeDebugPaths();
+    // visualizeDebugSpawns();
+    // visualizeDebugPaths();
 }
 
 await init();

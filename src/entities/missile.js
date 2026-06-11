@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { spawnExplosion } from '../rendering/effects.js';
 
-const SPEED = 50;
+const SPEED = 100;
 const GUIDANCE_FACTOR = 2.5;
-const MAX_RANGE = 450;
+const MAX_RANGE = 550;
 const TRAIL_INTERVAL = 0.03;
 const TRAIL_COLORS = [0x888888, 0x666666, 0x444444, 0x999999];
 

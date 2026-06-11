@@ -19,18 +19,14 @@ export class Tank {
     constructor(model) {
         this.model = model;
 
-        // Tank starts alive
-        // Who could have guessed
         this.state      = TankState.ALIVE;
         this.stateTimer = 0;
 
         // Reference to scene 
         this.scene = null;
 
-        // Transform properties
-        this.position = new THREE.Vector3(0, 0, 0);
-        this.rotation = new THREE.Euler(0, 0, 0);
-        this.scale    = new THREE.Vector3(1, 1, 1);
+        // Reference to terrain
+        this.terrain = null;
 
         // Aim state
         this.yaw   = 0;
@@ -56,15 +52,38 @@ export class Tank {
         this.group = new THREE.Group();
         this.group.add(model);
 
+        // Our tank model faces 90 degrees off, Blender and threejs magic
+        this.model.rotation.y = +Math.PI / 2;
+
+        // How far above the terrain our group origin should sit
+        const groundedBox = new THREE.Box3().setFromObject(model);
+        this.groundOffset = -groundedBox.min.y;
+
         // Raycaster to check for collisions
         this.raycaster = new THREE.Raycaster();
 
         // Make sure the tank is touching the ground
-        const box = new THREE.Box3().setFromObject(model);
+        const box        = new THREE.Box3().setFromObject(model);
         model.position.y = -box.min.y;
 
-        // Apply cell shading to the model
-        // applyCellShading(model);
+        // Navigation and movement
+        this.navMap     = null;
+        this.moveTarget = null;
+        this.path       = [];
+        this.pathIndex  = 0;
+
+        this.moveSpeed       = 6;
+        this.turnSpeed       = 1.0;
+        this.arrivalRadius   = 4.0;
+
+        this.pathRefreshTimer    = 0;
+        this.pathRefreshInterval = 1.0;
+
+        // Stuck detection: if we barely move for long enough, force a repath
+        // Catches cases where the tank clips a tree corner and wedges itself
+        this.lastKnownPosition = new THREE.Vector3();
+        this.stuckTimer        = 0;
+        this.stuckThreshold    = 1.5;
 
         // Search for expected bones in loaded model
         // Our model should have:
@@ -87,26 +106,162 @@ export class Tank {
         });
     }
 
+    // Make sure we don't have flying or sinking tanks
+    snapToGround(terrain) {
+        const x = this.group.position.x;
+        const z = this.group.position.z;
+        this.group.position.y = terrain.getHeightAt(x, z) + this.groundOffset;
+    }
+
     // Add the tank to a scene at specified position
-    addToScene(scene, position = new THREE.Vector3()) {
+    addToScene(scene, terrain, position = new THREE.Vector3()) {
         // Store reference to scene
-        this.scene = scene;
+        this.scene   = scene;
+        this.terrain = terrain;
 
         // Add our tank to scene
         scene.add(this.group);
-
-        // Sit on the ground after adding to scene
-        const box = new THREE.Box3().setFromObject(this.group);
-        this.group.position.y = -box.min.y;
 
         // Set spawn position, keep the ground-corrected Y
         this.group.position.x = position.x;
         this.group.position.z = position.z;
 
+        if (this.terrain) {
+            this.snapToGround(this.terrain);
+        } else {
+            this.group.position.y = position.y + this.groundOffset;
+        }
+
         // Force world matrix update before computing proxy positions
         this.group.updateMatrixWorld(true);
         // Now bones have correct world matrices
         this.addProxyMeshes(scene);
+
+        // Initialise stuck detection from actual spawn position
+        this.lastKnownPosition.copy(this.group.position);
+    }
+
+    // Setup navigation for our tank
+    setNavigation(navMap, moveTarget) {
+        this.navMap     = navMap;
+        this.moveTarget = moveTarget.clone();
+        this.refreshPath();
+    }
+
+    // Recompute our path
+    refreshPath() {
+        // Stop immediately if we dont have a navMap or a target to move to
+        if (!this.navMap || !this.moveTarget) return;
+
+        // Make sure world matrices are current before reading position
+        this.group.updateMatrixWorld(true);
+
+        // Snap start to nearest passable cell — the tank may be clipped into a
+        // blocked zone if it spawned near a tree or got wedged in a corner
+        const safeStart = this.navMap.findNearestPassable(
+            this.group.position.x,
+            this.group.position.z
+        );
+
+        const rawPath = this.navMap.findPath(safeStart, this.moveTarget) ?? [];
+
+        // No path means nowhere to go
+        if (rawPath.length === 0) {
+            this.path      = [];
+            this.pathIndex = 0;
+            return;
+        }
+
+        // Copy path points into a clean array
+        this.path      = rawPath.map(point => ({ x: point.x, z: point.z }));
+        // Skip the first point if it is just our current cell
+        this.pathIndex = this.path.length > 1 ? 1 : 0;
+    }
+
+    // Update the movement of our tank
+    updateMovement(delta) {
+        // Stop if we don't have a path yet
+        if (!this.path || this.path.length === 0) return;
+
+        // Stop once we've reached the end of the path
+        if (this.pathIndex >= this.path.length) return;
+
+        // Follow the current waypoint directly
+        // No corner cutting, less chance to clip trees
+        const waypoint = this.path[this.pathIndex];
+
+        // Direction from tank to target point
+        const toWaypoint = new THREE.Vector3(
+            waypoint.x - this.group.position.x,
+            0,
+            waypoint.z - this.group.position.z
+        );
+
+        // Distance to target point on the ground plane
+        const distanceToWaypoint = toWaypoint.length();
+
+        // If we're close enough, move to the next point in the path
+        if (distanceToWaypoint <= this.arrivalRadius) {
+            this.pathIndex++;
+            return;
+        }
+
+        // Calculate the yaw angle we need to face the target point
+        const desiredYaw = Math.atan2(toWaypoint.x, toWaypoint.z);
+
+        // Get the difference between desired and current yaw
+        let yawDifference = desiredYaw - this.group.rotation.y;
+
+        // Normalize to [-PI, PI] so we rotate the shortest way
+        while (yawDifference >  Math.PI) yawDifference -= Math.PI * 2;
+        while (yawDifference < -Math.PI) yawDifference += Math.PI * 2;
+
+        // Limit how much we can turn this frame
+        const maxTurnThisFrame = this.turnSpeed * delta;
+        this.group.rotation.y += THREE.MathUtils.clamp(yawDifference, -maxTurnThisFrame, maxTurnThisFrame);
+
+        // Calculate forward direction from current hull rotation
+        const facingDirection = new THREE.Vector3(0, 0, 1).applyAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            this.group.rotation.y
+        );
+
+        // Slow down harder when we need a big heading correction
+        // This makes corners feel smoother without skipping path points
+        const turnFactor = THREE.MathUtils.clamp(
+            1 - Math.abs(yawDifference) / (Math.PI * 0.75),
+            0.15,
+            1.0
+        );
+
+        // Also slow down a bit when we are very close to the waypoint
+        // Helps avoid overshooting and makes the turn-in feel softer
+        const approachFactor = THREE.MathUtils.clamp(distanceToWaypoint / 6, 0.35, 1.0);
+        const moveStep       = this.moveSpeed * turnFactor * approachFactor * delta;
+
+        // If we are facing way off target, mostly rotate first and crawl forward
+        // This feels more tank-like than sliding through the turn
+        this.group.position.addScaledVector(facingDirection, moveStep);
+
+        // Keep it on the ground after moving
+        if (this.terrain) this.snapToGround(this.terrain);
+
+        // Stuck detection: if we haven't moved meaningfully, increment the timer
+        // 0.3 units per second is basically stationary for a tank moving at speed 6
+        const distanceMoved = this.group.position.distanceTo(this.lastKnownPosition);
+
+        if (distanceMoved < 0.3 * delta) {
+            this.stuckTimer += delta;
+
+            if (this.stuckTimer >= this.stuckThreshold) {
+                this.stuckTimer = 0;
+                this.lastKnownPosition.copy(this.group.position);
+                this.refreshPath();
+            }
+        } else {
+            this.stuckTimer = 0;
+            this.lastKnownPosition.copy(this.group.position);
+        }
     }
 
     // Aim turret and gun toward a world position, IK
@@ -128,7 +283,9 @@ export class Tank {
             this.turretBone.parent.getWorldQuaternion(parentQuat);
             parentEuler.setFromQuaternion(parentQuat, 'YXZ');
 
-            this.turretBone.rotation.y = worldAngle - parentEuler.y;
+            // Our turret bone is rotated 90 degrees off in its rest pose
+            // It is what it is
+            this.turretBone.rotation.y = worldAngle - parentEuler.y + Math.PI / 2;
         }
 
         // Gun pitch
@@ -215,27 +372,24 @@ export class Tank {
 
     // Using raycast to check collision
     isHitBy(rayOrigin, rayDirection, maxDistance) {
-            this.raycaster.set(rayOrigin, rayDirection);
-            
-            // Limit the raycaster to only check the distance the missile traveled this exact frame
-            this.raycaster.far = maxDistance; 
-            
-            const hits = this.raycaster.intersectObject(this.group, true);
-            if (hits.length > 0){
-                return true;
-            }
-            return false;
-        }
+        this.raycaster.set(rayOrigin, rayDirection);
+
+        // Limit the raycaster to only check the distance the missile traveled this exact frame
+        this.raycaster.far = maxDistance;
+
+        const hits = this.raycaster.intersectObject(this.group, true);
+        return hits.length > 0;
+    }
 
     // When tank is destroyed, pitch the gun down and change color to look charred
     onDeath() {
         this.model.traverse((obj) => {
             if (obj.isMesh && !obj.userData.isOutline && !obj.userData.isProxy) {
                 // Tint the existing material to look charred rather than replacing it
-                obj.material = obj.material.clone();
+                obj.material               = obj.material.clone();
                 obj.material.color.set(0x1a1a1a);
-                obj.material.roughness    = 0.95;
-                obj.material.metalness    = 0.05;
+                obj.material.roughness         = 0.95;
+                obj.material.metalness         = 0.05;
                 obj.material.emissive.set(0x110a00);
                 obj.material.emissiveIntensity = 0.12;
                 // Keep the normal map for surface detail but darken everything else
@@ -255,8 +409,18 @@ export class Tank {
 
         switch (this.state) {
 
+            // Finally, IT LIVES
             case TankState.ALIVE:
-                // TODO: Add AI movement here later
+                this.pathRefreshTimer += delta;
+
+                if (this.pathRefreshTimer >= this.pathRefreshInterval) {
+                    this.pathRefreshTimer = 0;
+                    this.refreshPath();
+                }
+
+                this.updateMovement(delta);
+
+                if (this.moveTarget) this.aimAt(this.moveTarget);
                 break;
 
             case TankState.HIT:
@@ -267,11 +431,11 @@ export class Tank {
                 }
                 break;
 
-            case TankState.COOKOFF:
+            // const inside a case needs its own block scope or strict mode complains
+            case TankState.COOKOFF: {
                 // After being hit, start a timer before explosion
                 const firePos = new THREE.Vector3();
                 this.turretBone.getWorldPosition(firePos);
-
 
                 if (!this.fire) {
                     this.fire  = createFire(this.scene, firePos, camera);
@@ -285,19 +449,15 @@ export class Tank {
                 if (this.stateTimer > 2.0) {
                     this.state      = TankState.DEAD;
                     this.stateTimer = 0;
-                    this.onDeath();  
+                    this.onDeath();
                 }
                 break;
-
-
+            }
 
             case TankState.DEAD:
-                if (this.fire && this.smoke){
                 // Update effects each frame
                 this.fire?.update(delta, camera);
                 this.smoke?.update(delta, camera);
-                }
-
 
                 // Lerp gun down to sag position
                 if (this.gunBone) {
@@ -326,5 +486,4 @@ export class Tank {
         this.scene.remove(this.turretProxy);
         this.scene.remove(this.gunProxy);
     }
-
 }

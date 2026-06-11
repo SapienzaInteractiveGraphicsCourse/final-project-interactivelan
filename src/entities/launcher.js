@@ -498,8 +498,8 @@ export class Launcher {
         const targetPoint = new THREE.Vector3();
 
         // Instead of calculating ray collisions against the whole scene,
-        // we just place the target 300 meters straight down the camera's line of sight.
-        raycaster.ray.at(300, targetPoint);
+        // we just place the target 550 meters straight down the camera's line of sight.
+        raycaster.ray.at(550, targetPoint);
 
         return targetPoint;
     }

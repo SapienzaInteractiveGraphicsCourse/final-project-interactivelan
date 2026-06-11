@@ -4,33 +4,43 @@ const loader = new THREE.TextureLoader();
 
 // Load a texture with flipY disabled, required for Substance Painter exports apparently
 function loadTex(path) {
-    const t = loader.load(path);
-    t.flipY = false;
-    return t;
+    const texture = loader.load(path);
+    texture.flipY = false;
+    return texture;
 }
 
-export const materialLauncher = new THREE.MeshStandardMaterial({
-    map:          loadTex(`${import.meta.env.BASE_URL}textures/launcher/Base.png`),
-    normalMap:    loadTex(`${import.meta.env.BASE_URL}textures/launcher/Normal_OpenGL.png`),
-    roughnessMap: loadTex(`${import.meta.env.BASE_URL}textures/launcher/Roughness.png`),
-    metalnessMap: loadTex(`${import.meta.env.BASE_URL}textures/launcher/Metallic.png`),
-    aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/launcher/AO.png`),
-});
+// Let's create a single factory to creature our materials, what we weere doing here was kind of futile
 
-export const materialTank = new THREE.MeshStandardMaterial({
-    map:          loadTex(`${import.meta.env.BASE_URL}textures/tank/Base.png`),
-    normalMap:    loadTex(`${import.meta.env.BASE_URL}textures/tank/Normal_OpenGL.png`),
-    roughnessMap: loadTex(`${import.meta.env.BASE_URL}textures/tank/Roughness.png`),
-    metalnessMap: loadTex(`${import.meta.env.BASE_URL}textures/tank/Metallic.png`),
-    aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/tank/AO.png`),
-});
+// Generate a PBR Material from our Texture folders
+function makePBR(dir, metalnessOverride = -1){
+    // Build our texture's dir path
+    const dirPath = `${import.meta.env.BASE_URL}textures/${dir}`;
 
-export const materialTerrain = new THREE.MeshStandardMaterial({
-    map:          loadTex(`${import.meta.env.BASE_URL}textures/terrain/Base.png`),
-    normalMap:    loadTex(`${import.meta.env.BASE_URL}textures/terrain/Normal_OpenGL.png`),
-    roughnessMap: loadTex(`${import.meta.env.BASE_URL}textures/terrain/Roughness.png`),
-    aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/terrain/AO.png`),
-});
+    // Return a new material with our textures
+    const material =  new THREE.MeshStandardMaterial({
+        map:          loadTex(`${dirPath}/Base.png`),
+        normalMap:    loadTex(`${dirPath}/Normal_OpenGL.png`),
+        roughnessMap: loadTex(`${dirPath}/Roughness.png`),
+        aoMap:        loadTex(`${dirPath}/AO.png`),
+        metalness:    0.0
+    })
+    if (metalnessOverride !== -1) {
+        material.metalness = metalnessOverride
+    }
+    return material;
+}
+
+// Create our materials
+export const materialLauncher = makePBR('launcher');
+export const materialTank = makePBR('tank');
+export const materialTreeA = makePBR('tree_a');
+export const materialTreeB = makePBR('tree_b');
+export const materialTreeC = makePBR('tree_c');
+
+// Our Material Terrain is slightly more complicated
+export const materialTerrain = makePBR('terrain');
+
+// Set our tiling for terrain
 materialTerrain.map.repeat.set(100, 100);
 materialTerrain.map.wrapS = THREE.RepeatWrapping;
 materialTerrain.map.wrapT = THREE.RepeatWrapping;
@@ -50,27 +60,3 @@ materialTerrain.aoMap.wrapT = THREE.RepeatWrapping;
 
 // Make the terrain normals stronger so light shows more surface detail
 materialTerrain.normalScale = new THREE.Vector2(2.0, 2.0);
-
-export const materialTreeA = new THREE.MeshStandardMaterial({
-    map:          loadTex(`${import.meta.env.BASE_URL}textures/tree_a/Base.png`),
-    normalMap:    loadTex(`${import.meta.env.BASE_URL}textures/tree_a/Normal_OpenGL.png`),
-    aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/tree_a/AO.png`),
-    metalness:    0.0,  
-    roughness:    0.9  
-});
-
-export const materialTreeB = new THREE.MeshStandardMaterial({
-    map:          loadTex(`${import.meta.env.BASE_URL}textures/tree_b/Base.png`),
-    normalMap:    loadTex(`${import.meta.env.BASE_URL}textures/tree_b/Normal_OpenGL.png`),
-    aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/tree_b/AO.png`),
-    metalness:    0.0,
-    roughness:    0.9
-});
-
-export const materialTreeC = new THREE.MeshStandardMaterial({
-    map:          loadTex(`${import.meta.env.BASE_URL}textures/tree_c/Base.png`),
-    normalMap:    loadTex(`${import.meta.env.BASE_URL}textures/tree_c/Normal_OpenGL.png`),
-    aoMap:        loadTex(`${import.meta.env.BASE_URL}textures/tree_c/AO.png`),
-    metalness:    0.0,  
-    roughness:    0.9
-});

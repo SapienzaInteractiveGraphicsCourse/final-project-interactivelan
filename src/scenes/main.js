@@ -18,8 +18,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('skyblue');
-//scene.fog = new THREE.Fog(0x87ceeb, 140, 380);
+scene.background = new THREE.Color(0x8cbfff);
 
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -32,6 +31,14 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+// A little bit of light improvemente to make things look better
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+if ('outputColorSpace' in renderer) {
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+} else {
+    renderer.outputEncoding = THREE.sRGBEncoding;
+}
 document.body.appendChild(renderer.domElement);
 
 window.scene = scene;
@@ -43,20 +50,23 @@ let lastTime = performance.now();
 
 
 // Lighting
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(10, 5, 5);
+const sun = new THREE.DirectionalLight(0xfff1e8, 1.2);
+sun.position.set(20, 30, 10);
 sun.castShadow = true;
-sun.shadow.bias = -0.005;
+sun.shadow.bias = -0.0005;
+sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 0.5;
 sun.shadow.camera.far = 2000;
-sun.shadow.camera.left = -600;
-sun.shadow.camera.right = 600;
-sun.shadow.camera.top = 600;
-sun.shadow.camera.bottom = -600;
+sun.shadow.camera.left = -120;
+sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120;
+sun.shadow.camera.bottom = -120;
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+const hemisphere = new THREE.HemisphereLight(0xddeeff, 0x443322, 0.6);
+const ambient = new THREE.AmbientLight(0xffffff, 0.15);
 
 scene.add(sun);
+scene.add(hemisphere);
 scene.add(ambient);
 
 
@@ -92,7 +102,8 @@ const terrain = new Terrain(
 
 // World setup
 const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.7);
-createGrass(scene, terrain.terrain, renderer);
+const grass = createGrass(scene, terrain);
+
 
 worldObstacles.push(terrain.terrain);
 
@@ -182,6 +193,8 @@ async function init() {
     terrain.terrain.updateMatrixWorld(true);
 
     launcher.addToScene(scene, terrain.launcherSpawn);
+    // Make rotation limits relative to the map center (0,0,0)
+    launcher.setMapCenter(new THREE.Vector3(0, 0, 0));
     launcher.faceToward(new THREE.Vector3(0, 0, 0));
     launcher.setMainCamera();
 

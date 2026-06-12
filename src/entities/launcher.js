@@ -584,15 +584,35 @@ export class Launcher {
     // Point the launcher toward a world position on spawn
     // Sets the base yaw so the operator faces the right way from the start
     faceToward(targetPosition) {
+        // If a map center was provided, compute yaw origin relative to it
+        const refPos = this.mapCenter ? this.mapCenter : targetPosition;
         const direction = new THREE.Vector3(
-            targetPosition.x - this.position.x,
+            refPos.x - this.position.x,
             0,
-            targetPosition.z - this.position.z
+            refPos.z - this.position.z
         ).normalize();
 
         // + PI because the launcher model's forward is flipped in Blender vs Three.js
         this.yaw       = Math.atan2(direction.x, direction.z) + Math.PI;
         this.yawOrigin = this.yaw;
+    }
+
+    // Allow externally setting the map center so rotation limits are calculated relative to the center of the map
+    // We want to limit fov relative to map center for gameplay reasons
+    setMapCenter(centerPosition) {
+        if (!centerPosition) return;
+        this.mapCenter = centerPosition.clone ? centerPosition.clone() : new THREE.Vector3(centerPosition.x, centerPosition.y, centerPosition.z);
+
+        // If we already have a position for the launcher, update yaw origin now
+        if (this.position) {
+            const direction = new THREE.Vector3(
+                this.mapCenter.x - this.position.x,
+                0,
+                this.mapCenter.z - this.position.z
+            ).normalize();
+            this.yaw = Math.atan2(direction.x, direction.z) + Math.PI;
+            this.yawOrigin = this.yaw;
+        }
     }
 
     // Missile is fired

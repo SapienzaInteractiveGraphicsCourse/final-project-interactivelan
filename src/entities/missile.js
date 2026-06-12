@@ -8,11 +8,13 @@ const TRAIL_INTERVAL = 0.03;
 const TRAIL_COLORS = [0x888888, 0x666666, 0x444444, 0x999999];
 
 export class Missile {
-    constructor(spawnPosition, spawnDirection) {
+    constructor(spawnPosition, spawnDirection, gameAudio = null) {
         this.distanceTravelled = 0;
         this.alive = true;
         this.active = false;
         this.controlled = true;
+
+        this.gameAudio = gameAudio;
 
         this.position = spawnPosition.clone();
         this.direction = spawnDirection.clone().normalize();
@@ -31,6 +33,24 @@ export class Missile {
 
     addToScene(scene) {
         scene.add(this.mesh);
+
+
+        if (this.gameAudio) {
+            this.flightSound = this.gameAudio.createPositional('launcherFire', {
+                loop: false,
+                volume: 0.6,
+                refDistance: 40,
+                rolloffFactor: 0.8,
+                maxDistance: 250,
+                distanceModel: 'inverse'
+            });
+
+
+            if (this.flightSound) {
+                this.mesh.add(this.flightSound);
+                this.flightSound.play();
+            }
+        }
     }
 
     update(delta, targetPoint, tanks, collidables, scene) {
@@ -103,8 +123,49 @@ export class Missile {
         return false;
     }
 
-    destroy(scene) {
-        scene.remove(this.mesh);
-        this.alive = false;
+destroy(scene) {
+    if (!this.alive) return;
+
+    // Stop the missile flight sound since the missile no longer exists
+    if (this.flightSound && this.flightSound.isPlaying) {
+        this.flightSound.stop();
     }
+
+    // Spawn a one-shot explosion sound at the missile's last known position
+    if (this.gameAudio) {
+        const explosionSound = this.gameAudio.createPositional('missileExplosion', {
+            loop: false,
+            volume: 0.5,
+            refDistance: 45,
+            rolloffFactor: 1.0,
+            maxDistance: 300,
+            distanceModel: 'inverse',
+        });
+
+        if (explosionSound) {
+            const explosionAnchor = new THREE.Object3D();
+            explosionAnchor.position.copy(this.position);
+            scene.add(explosionAnchor);
+            explosionAnchor.add(explosionSound);
+            explosionSound.play();
+
+            // Remove the temporary sound node after playback finishes
+            const duration = explosionSound.buffer ? explosionSound.buffer.duration : 2;
+            setTimeout(() => {
+                if (explosionSound.isPlaying) {
+                    explosionSound.stop();
+                }
+                scene.remove(explosionAnchor);
+            }, duration * 1000);
+        }
+    }
+
+    // Remove mesh from scene
+    if (this.mesh) {
+        scene.remove(this.mesh);
+    }
+
+    this.alive = false;
+    }
+
 }

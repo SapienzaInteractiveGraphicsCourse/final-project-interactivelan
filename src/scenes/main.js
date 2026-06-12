@@ -10,10 +10,11 @@ import { Terrain } from '../core/terrain.js';
 import { placeTrees } from '../core/clutter.js';
 import { createGrass } from '../core/grass.js';
 
-import { applyCellShading } from '../rendering/shaders.js';
 import { updateExplosions } from '../rendering/effects.js';
 
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+import { GameAudio, preloadAudio } from '../core/audio.js';
 
 
 // Scene setup
@@ -73,10 +74,13 @@ scene.add(ambient);
 // Input
 const input = new InputHandler();
 
+// Audio
+const gameAudio = new GameAudio(camera);
+await preloadAudio(gameAudio);
+
 
 // Assets
 const launcherModel = await loadModel(`${import.meta.env.BASE_URL}models/launcher.glb`);
-applyCellShading(launcherModel);
 
 const tankModel = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
 const treeModels = await loadTreeModels();
@@ -108,7 +112,7 @@ const grass = createGrass(scene, terrain);
 worldObstacles.push(terrain.terrain);
 
 // Game objects
-const launcher = new Launcher(launcherModel, worldObstacles);
+const launcher = new Launcher(launcherModel, worldObstacles, gameAudio);
 const tanks = [];
 
 
@@ -140,7 +144,7 @@ function addTank(position) {
     // SkeletonUtils.clone is required for skinned meshes since model.clone() doesn't copy the skeleton correctly and breaks bone animations on the second tank
     // The more you know
     const clonedModel = SkeletonUtils.clone(tankModel);
-    const tank        = new Tank(clonedModel);
+    const tank        = new Tank(clonedModel, gameAudio);
 
     tanks.push(tank);
     tank.addToScene(scene, terrain, groundedPosition);
@@ -225,7 +229,10 @@ function animate() {
 
     updateExplosions(delta);
 
-    renderer.render(scene, launcher.activeCamera ?? camera);
+    const activeCamera = launcher.activeCamera ?? camera;
+    gameAudio.setCamera(activeCamera);
+
+    renderer.render(scene, activeCamera);
 }
 
 renderer.setAnimationLoop(animate);

@@ -7,7 +7,7 @@ import { materialTank } from '../rendering/materials.js';
 export const TankState = Object.freeze({
     // Tank is moving and operational
     ALIVE:   'ALIVE',
-    // Tank was hit 
+    // Tank was hit
     HIT:     'HIT',
     // Ammunition cookoff: tank blows up
     COOKOFF: 'COOKOFF',
@@ -16,14 +16,19 @@ export const TankState = Object.freeze({
 });
 
 export class Tank {
-    constructor(model) {
+    constructor(model, gameAudio = null) {
         this.model = model;
-
         this.state      = TankState.ALIVE;
         this.stateTimer = 0;
 
-        // Reference to scene 
+        // Reference to scene
         this.scene = null;
+
+        // Reference to audio
+        this.gameAudio = gameAudio;
+        this.moveSound = null;
+        this.explosionSound = null;
+        this.deathSoundPlayed = false;
 
         // Reference to terrain
         this.terrain = null;
@@ -113,6 +118,17 @@ export class Tank {
         this.group.position.y = terrain.getHeightAt(x, z) + this.groundOffset;
     }
 
+    // Smoothly fade our movement audio instead of hard stopping and replaying it
+    setMoveSoundVolume(targetVolume, fadeTime = 0.12) {
+        if (!this.moveSound || !this.moveSound.gain) return;
+        const context = this.moveSound.context;
+        const gain    = this.moveSound.gain.gain;
+        const now     = context.currentTime;
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(gain.value, now);
+        gain.linearRampToValueAtTime(targetVolume, now + fadeTime);
+    }
+
     // Add the tank to a scene at specified position
     addToScene(scene, terrain, position = new THREE.Vector3()) {
         // Store reference to scene
@@ -121,6 +137,36 @@ export class Tank {
 
         // Add our tank to scene
         scene.add(this.group);
+
+        // If we have audio available, create our positional sounds and attach them to the tank
+        if (this.gameAudio) {
+            this.moveSound = this.gameAudio.createPositional('tankEngine', {
+                loop: true,
+                volume: 0.10,
+                refDistance: 25,
+                rolloffFactor: 2.5,
+                maxDistance: 90,
+                distanceModel: 'inverse',
+            });
+
+            this.explosionSound = this.gameAudio.createPositional('tankExplosion', {
+                loop: false,
+                volume: 1.0,
+                refDistance: 24,
+                rolloffFactor: 2.0,
+                maxDistance: 120,
+                distanceModel: 'inverse',
+            });
+
+            if (this.moveSound) {
+                this.group.add(this.moveSound);
+                this.moveSound.play();
+            }
+
+            if (this.explosionSound) {
+                this.group.add(this.explosionSound);
+            }
+        }
 
         // Set spawn position, keep the ground-corrected Y
         this.group.position.x = position.x;
@@ -180,11 +226,8 @@ export class Tank {
 
     // Update the movement of our tank
     updateMovement(delta) {
-        // Stop if we don't have a path yet
-        if (!this.path || this.path.length === 0) return;
 
-        // Stop once we've reached the end of the path
-        if (this.pathIndex >= this.path.length) return;
+        let movedThisFrame = false;
 
         // Follow the current waypoint directly
         // No corner cutting, less chance to clip trees
@@ -202,6 +245,7 @@ export class Tank {
 
         // If we're close enough, move to the next point in the path
         if (distanceToWaypoint <= this.arrivalRadius) {
+            this.setMoveSoundVolume(0.0);
             this.pathIndex++;
             return;
         }
@@ -242,9 +286,15 @@ export class Tank {
         // If we are facing way off target, mostly rotate first and crawl forward
         // This feels more tank-like than sliding through the turn
         this.group.position.addScaledVector(facingDirection, moveStep);
+        movedThisFrame = moveStep > 0.01;
 
         // Keep it on the ground after moving
         if (this.terrain) this.snapToGround(this.terrain);
+
+        // Fade movement sound depending on whether the tank is actually moving
+        if (this.moveSound) {
+            this.setMoveSoundVolume(movedThisFrame ? 0.25 : 0.0);
+        }
 
         // Stuck detection: if we haven't moved meaningfully, increment the timer
         // 0.3 units per second is basically stationary for a tank moving at speed 6
@@ -269,7 +319,7 @@ export class Tank {
     aimAt(worldTarget) {
         if (this.state !== TankState.ALIVE) return;
 
-        // Turret yaw 
+        // Turret yaw
         if (this.turretBone) {
             const boneWorldPos = new THREE.Vector3();
             this.turretBone.getWorldPosition(boneWorldPos);
@@ -307,6 +357,7 @@ export class Tank {
 
         this.state      = TankState.HIT;
         this.stateTimer = 0;
+        this.setMoveSoundVolume(0.0, 0.08);
 
         // Main blast
         spawnExplosion(this.scene, hitPosition, 60, 2.4);
@@ -447,6 +498,13 @@ export class Tank {
                 this.smoke?.update(delta, camera);
 
                 if (this.stateTimer > 2.0) {
+                    this.setMoveSoundVolume(0.0, 0.08);
+
+                    if (this.explosionSound && !this.deathSoundPlayed) {
+                        this.explosionSound.play();
+                        this.deathSoundPlayed = true;
+                    }
+
                     this.state      = TankState.DEAD;
                     this.stateTimer = 0;
                     this.onDeath();
@@ -472,6 +530,11 @@ export class Tank {
     }
 
     destroy() {
+        // Clean up audio
+        this.setMoveSoundVolume(0.0, 0.05);
+        if (this.moveSound && this.moveSound.isPlaying) this.moveSound.stop();
+        if (this.explosionSound && this.explosionSound.isPlaying) this.explosionSound.stop();
+
         // Clean up fire and smoke effects
         this.fire?.destroy();
         this.smoke?.destroy();

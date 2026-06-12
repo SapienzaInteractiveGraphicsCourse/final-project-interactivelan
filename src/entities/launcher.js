@@ -18,10 +18,13 @@ export const LauncherState = Object.freeze({
 
 // Our class handling the main part of the game: the Launcher
 export class Launcher {
-    constructor(model, worldObastacles = []) {
+    constructor(model, worldObastacles = [], gameAudio = null) {
         this.model = model;
         // Launcher starts as ready to fire
         this.state = LauncherState.READY;
+
+        // Our audio handler
+        this.gameAudio = gameAudio;
 
         this.worldObastacles = worldObastacles;
 
@@ -114,9 +117,9 @@ export class Launcher {
         //   \-> Launcher
         //     \-> Missile
         model.traverse((obj) => {
-            if (obj.isMesh) console.log('Mesh found:', obj.name);
+            // if (obj.isMesh) console.log('Mesh found:', obj.name);
             if (obj.isBone) {
-                console.log('Bone found:', obj.name);
+                // console.log('Bone found:', obj.name);
                 if (obj.name === 'Middle')   this.middleBone   = obj;
                 if (obj.name === 'Launcher') this.launcherBone = obj;
                 if (obj.name === 'Tube')     this.missileBone  = obj;
@@ -401,7 +404,7 @@ export class Launcher {
 
             const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
 
-            console.log(box.min.y, groundY);
+            // console.log(box.min.y, groundY);
             if (box.min.y <= groundY) {
                 this.looseTubePhysics.mesh.position.y += groundY - box.min.y;
                 this.looseTubePhysics.velocity.set(0, 0, 0);
@@ -512,6 +515,18 @@ export class Launcher {
             // Distance and height the free-look camera sits behind the launcher
             this.freeLookDistance = 20;
             this.freeLookHeight   = 8;
+
+            // If we have provided an audio source, let's create some positional sounds attached to the launcher
+            if (this.gameAudio) {
+                this.tubeTossSound = this.gameAudio.createPositional('tubeToss', {
+                    volume: 0.7,
+                    refDistance: 12,
+                    rolloffFactor: 1.3,
+                    maxDistance: 80,
+                });
+
+                this.group.add(this.tubeTossSound);
+            }
         }
 
         // Create the default operator camera in first-person, parented to the launcher bone
@@ -630,8 +645,9 @@ export class Launcher {
         spawnDir.negate();
 
         // Spawn new missile
-        this.missile = new Missile(spawnPos, spawnDir);
+        this.missile = new Missile(spawnPos, spawnDir, this.gameAudio);
         this.missile.addToScene(scene);
+
 
         // Transition to FIRED state (locks out reloading until impact)
         this.state = LauncherState.FIRED;

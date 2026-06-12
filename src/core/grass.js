@@ -10,83 +10,17 @@ const BLADE_MAX_HEIGHT = 1.1;
 // No grass inside this radius around the launcher, keeps the tripod area clean
 const LAUNCHER_CLEAR_RADIUS = 4;
 
-// Generate a smooth noise texture on a canvas
-// Only used for wind animation now, height variation moved to the CPU
-function generateNoiseTexture() {
-    const size   = 256;
-    const canvas = document.createElement('canvas');
-    canvas.width  = size;
-    canvas.height = size;
-    const ctx       = canvas.getContext('2d');
-    const imageData = ctx.createImageData(size, size);
-
-    // Fill with smooth-ish noise by averaging random values
-    const raw = new Float32Array(size * size * 3);
-    for (let i = 0; i < raw.length; i++) raw[i] = Math.random();
-
-    // Simple box blur pass for smoothness
-    for (let y = 1; y < size - 1; y++) {
-        for (let x = 1; x < size - 1; x++) {
-            for (let c = 0; c < 3; c++) {
-                const idx = (y * size + x) * 3 + c;
-                raw[idx] = (
-                    raw[((y-1)*size + x)   * 3 + c] +
-                    raw[((y+1)*size + x)   * 3 + c] +
-                    raw[(y*size + (x-1))   * 3 + c] +
-                    raw[(y*size + (x+1))   * 3 + c] +
-                    raw[idx]
-                ) / 5;
-            }
-        }
-    }
-
-    for (let i = 0; i < size * size; i++) {
-        imageData.data[i * 4]     = raw[i * 3]     * 255;
-        imageData.data[i * 4 + 1] = raw[i * 3 + 1] * 255;
-        imageData.data[i * 4 + 2] = raw[i * 3 + 2] * 255;
-        imageData.data[i * 4 + 3] = 255;
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    return texture;
-}
-
-// The vertex shader only handles what actually changes at runtime: blade shape and wind
+// The vertex shader only handles blade shape
 // Everything static (position, terrain height, blade height, color tint) is baked on the CPU
-// Wind technique still from Peter Adams / Antaeus AR blogpost
+// Blade technique still from Peter Adams / Antaeus AR blogpost
 const vertexShader = `
-    uniform float uTime;
-    uniform sampler2D uNoiseTexture;
     uniform float uBladeWidth;
-    uniform float uWindDirection;
-    uniform float uWindSpeed;
-    uniform float uWindNoiseScale;
-    uniform float uMaxBendAngle;
 
     attribute vec3  aYaw;
     attribute float aBladeHeight;
     attribute float aTint;
 
     varying vec3 vColor;
-
-    float map(float value, float min1, float max1, float min2, float max2) {
-        return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
-    }
-
-    mat3 rotate3d(vec3 axis, float angle) {
-        axis     = normalize(axis);
-        float s  = sin(angle);
-        float c  = cos(angle);
-        float oc = 1.0 - c;
-        return mat3(
-            oc*axis.x*axis.x + c,          oc*axis.x*axis.y - axis.z*s,  oc*axis.z*axis.x + axis.y*s,
-            oc*axis.x*axis.y + axis.z*s,  oc*axis.y*axis.y + c,          oc*axis.y*axis.z - axis.x*s,
-            oc*axis.z*axis.x - axis.y*s,  oc*axis.y*axis.z + axis.x*s,  oc*axis.z*axis.z + c
-        );
-    }
 
     void main() {
         // position already holds the blade base in world space, baked at build time
@@ -97,21 +31,8 @@ const vertexShader = `
         float width  = uBladeWidth * clamp(aBladeHeight, 0.4, 1.2);
         transformed += aYaw * (width / 2.0) * factor;
 
-        // Wind effect using scrolling noise texture
-        float noiseScale     = uWindNoiseScale * 0.1;
-        vec2  noiseUV        = vec2(position.x * noiseScale, position.z * noiseScale);
-        mat2  windRot        = mat2(cos(uWindDirection), -sin(uWindDirection),
-                                    sin(uWindDirection),  cos(uWindDirection));
-        vec2  rotatedNoiseUV = windRot * noiseUV + uTime * vec2(uWindSpeed);
-        vec3  windNoise      = texture2D(uNoiseTexture, rotatedNoiseUV).rgb;
-
-        vec3  axis   = vec3(windNoise.g, 0.0, windNoise.b);
-        float angle  = radians(map(windNoise.g + windNoise.b, 0.0, 2.0, -uMaxBendAngle, uMaxBendAngle)) * color.g;
-        mat3  rotMat = rotate3d(axis, angle);
-
-        // The tip offset is purely vertical before wind, so we just rotate it and add
-        vec3 tipOffset = rotMat * vec3(0.0, aBladeHeight * color.g, 0.0);
-        transformed   += tipOffset;
+        // The tip is just raised vertically
+        transformed.y += aBladeHeight * color.g;
 
         // Grass color: dark at base, lighter at tip, per blade tint baked on the CPU
         vec3 baseColor = mix(vec3(0.18, 0.30, 0.05), vec3(0.42, 0.62, 0.12), color.g);
@@ -152,13 +73,14 @@ function buildGrassGeometry(count, terrain) {
         const x = THREE.MathUtils.randFloat(-halfMap, halfMap);
         const z = THREE.MathUtils.randFloat(-halfMap, halfMap);
 
-        // Bald patches: low noise areas grow no grass
+        // Density is the probability a blade grows here, so patches thin out gradually instead of cutting off at a hard noise contour
+        // Skips don't increment placed, rejected samples get retried elsewhere
         const density = (densityNoise(x * 0.02, z * 0.02) + 1) / 2;
-        if (density < 0.25) { placed++; continue; }
+        if (Math.random() > density * 1.4) continue;
 
         // Keep the launcher plateau clean
         const distanceToLauncher = Math.hypot(x - launcherX, z - launcherZ);
-        if (distanceToLauncher < LAUNCHER_CLEAR_RADIUS) { placed++; }
+        if (distanceToLauncher < LAUNCHER_CLEAR_RADIUS) continue;
 
         // Blade height varies with the same noise so tall and short grass cluster together
         const bladeHeight = THREE.MathUtils.lerp(BLADE_MIN_HEIGHT, BLADE_MAX_HEIGHT, density)
@@ -201,11 +123,10 @@ function buildGrassGeometry(count, terrain) {
     return geometry;
 }
 
-// Create the grass system, fully static apart from wind
+// Create the grass system, fully static
 // Takes the Terrain class instance so heights come from getHeightAt instead of a GPU render
 export function createGrass(scene, terrain) {
-    const noiseTexture = generateNoiseTexture();
-    const geometry     = buildGrassGeometry(BLADE_COUNT, terrain);
+    const geometry = buildGrassGeometry(BLADE_COUNT, terrain);
 
     const material = new THREE.ShaderMaterial({
         vertexShader,
@@ -213,13 +134,7 @@ export function createGrass(scene, terrain) {
         vertexColors: true,
         side:         THREE.DoubleSide,
         uniforms: {
-            uTime:           { value: 0 },
-            uNoiseTexture:   { value: noiseTexture },
-            uBladeWidth:     { value: BLADE_WIDTH },
-            uWindDirection:  { value: Math.PI * 0.25 },
-            uWindSpeed:      { value: 0.3 },
-            uWindNoiseScale: { value: 0.9 },
-            uMaxBendAngle:   { value: 22 },
+            uBladeWidth: { value: BLADE_WIDTH },
         }
     });
 
@@ -228,17 +143,10 @@ export function createGrass(scene, terrain) {
     scene.add(mesh);
 
     return {
-        // Call each frame, only time changes now
-        update(elapsed) {
-            // Wrap so float precision doesn't degrade the wind after long sessions
-            material.uniforms.uTime.value = elapsed % 1000;
-        },
-
         dispose() {
             scene.remove(mesh);
             geometry.dispose();
             material.dispose();
-            noiseTexture.dispose();
         }
     };
 }

@@ -8,6 +8,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Terrain } from '../core/terrain.js';
 import { placeTrees } from '../core/clutter.js';
 import { loadTreeModels } from '../utilities/loader.js';
+import { createGrass } from '../core/grass.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
@@ -19,11 +20,10 @@ const camera = new THREE.PerspectiveCamera(
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setAnimationLoop(animate);
 
 // Let's add shadows to the renderer
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type    = THREE.PCFShadowMap;
 
 document.body.appendChild(renderer.domElement);
 
@@ -36,11 +36,11 @@ const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(100, 50, 50);
 
 // We need a big enough shadow map
-light.shadow.camera.near = 0.5;
-light.shadow.camera.far = 2000;
-light.shadow.camera.left = -600;
-light.shadow.camera.right = 600;
-light.shadow.camera.top = 600;
+light.shadow.camera.near   = 0.5;
+light.shadow.camera.far    = 2000;
+light.shadow.camera.left   = -600;
+light.shadow.camera.right  = 600;
+light.shadow.camera.top    = 600;
 light.shadow.camera.bottom = -600;
 
 light.castShadow = true;
@@ -54,7 +54,7 @@ scene.add(ambient);
 camera.position.set(0, 200, 300);
 camera.lookAt(0, 0, 0);
 
-window.scene = scene;
+window.scene  = scene;
 window.camera = camera;
 
 // We want auto resize
@@ -66,7 +66,7 @@ window.addEventListener('resize', () => {
 
 // Set some variables for our navMap
 let navMapVisible = false;
-let navMapMeshes = [];
+let navMapMeshes  = [];
 let navMap;
 let terrain;
 
@@ -78,7 +78,7 @@ window.addEventListener('keydown', (e) => {
         if (navMapVisible) {
             navMapMeshes = navMap.visualize(scene);
         } else {
-            navMapMeshes.forEach((m) => scene.remove(m));
+            navMapMeshes.forEach(m => scene.remove(m));
             navMapMeshes = [];
         }
     }
@@ -89,10 +89,10 @@ scene.background = new THREE.Color('skyblue');
 
 // Async setup so we can await tree loading
 async function init() {
-    const terrainSize = 500;
+    const terrainSize     = 500;
     const terrainSegments = 120;
-    const frequency = 0.005;
-    const amplitude = 25;
+    const frequency       = 0.005;
+    const amplitude       = 25;
 
     // Create terrain class instance
     terrain = new Terrain(
@@ -118,8 +118,11 @@ async function init() {
     // Add terrain mesh to scene
     terrain.addToScene(scene);
 
+    // Force matrix update after adding to scene so raycasts work immediately
+    terrain.terrain.updateMatrixWorld(true);
+
     // Visualize launcher spawn
-    // We want to check if it will be placed properly on the
+    // We want to check if it will be placed properly on the terrain
     if (terrain.launcherSpawn) {
         const launcherMarker = new THREE.Mesh(
             new THREE.SphereGeometry(3, 16, 16),
@@ -148,6 +151,8 @@ async function init() {
     // Place trees on terrain
     placeTrees(scene, terrain, treeModels, 3, 0.6);
 
+    // Create grass 
+    createGrass(scene, terrain);
 }
 
 init();
@@ -156,3 +161,6 @@ function animate() {
     controls.update();
     renderer.render(scene, camera);
 }
+
+// All done, start the scene
+renderer.setAnimationLoop(animate);

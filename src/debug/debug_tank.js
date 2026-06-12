@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel }     from '../utilities/loader.js';
 import { InputHandler }  from '../core/input.js';
 import { Tank }          from '../entities/tank.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 import { updateExplosions } from '../rendering/effects.js';
 
@@ -49,7 +50,6 @@ class TankDebugger {
             setTimeout(() => this.scene.remove(sphere), 2000);
         });
     }
-
 }
 
 // Some code borrowed from debug_launcher.js
@@ -58,7 +58,6 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setAnimationLoop(animate);
 
 // Let's add shadows to the renderer
 renderer.shadowMap.enabled = true;
@@ -118,9 +117,11 @@ const hitPosition = new THREE.Vector3(-3, 2, 2.5);
 
 async function init() {
     // Load the tank model and hand it to the Tank class
+    // SkeletonUtils.clone required for skinned meshes — regular clone breaks the skeleton
     const model = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
-    tank = new Tank(model);
-    tank.addToScene(scene,  new THREE.Vector3(0,0,0));
+    tank = new Tank(SkeletonUtils.clone(model));
+    // No terrain in this debug scene, tank sits at y=0
+    tank.addToScene(scene, null, new THREE.Vector3(0, 0, 0));
 
     // Start debugger
     const tankDebugger = new TankDebugger(tank, scene, camera, renderer, input);
@@ -164,11 +165,11 @@ function animate() {
         tank.update(delta, camera);
     }
 
-
     controls.update();
 
     updateExplosions(delta);
 
-
     renderer.render(scene, camera);
 }
+
+renderer.setAnimationLoop(animate);

@@ -327,6 +327,71 @@ export class Launcher {
         }
     }
 
+    updateLooseTubePhysics(delta) {
+        // Simulate loose tube physics
+        // Stop when it hits the ground
+        if (this.looseTubePhysics) {
+            this.looseTubePhysics.velocity.y -= 12 * delta;
+            this.looseTubePhysics.mesh.position.addScaledVector(this.looseTubePhysics.velocity, delta);
+
+            // Raycast down from tube position to find actual terrain height
+            const tubePos = this.looseTubePhysics.mesh.position;
+            const raycaster = new THREE.Raycaster(
+                new THREE.Vector3(tubePos.x, tubePos.y + 10, tubePos.z),
+                new THREE.Vector3(0, -1, 0)
+            );
+            const hits     = this.terrain ? raycaster.intersectObject(this.terrain, false) : [];
+            const groundY  = hits.length > 0 ? hits[0].point.y : 0;
+
+            const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
+
+            // console.log(box.min.y, groundY);
+            if (box.min.y <= groundY) {
+                this.looseTubePhysics.mesh.position.y += groundY - box.min.y;
+                this.looseTubePhysics.velocity.set(0, 0, 0);
+                this.looseTubePhysics = null;
+
+                if (this.state === LauncherState.TOSSING) {
+                    this.state       = LauncherState.RELOADING;
+                    this.reloadTimer = 0;
+                    this.missileBone.position.set(0, 2, 0);
+                    this.reloadStartPos.copy(this.missileBone.position);
+                    this.tubeMesh.visible = true;
+                }
+            }
+        }
+    }
+    
+    updateReloadAnimation(delta) {
+        // Reload animation we lerp the bone position from above down to rest position
+        if (this.state === LauncherState.RELOADING) {
+            this.reloadTimer += delta;
+            const t = Math.min(this.reloadTimer / this.RELOAD_DURATION, 1);
+
+            // Smoothstep for a more natural easing
+            const smooth = t * t * (3 - 2 * t);
+            this.missileBone.position.lerpVectors(this.reloadStartPos, this.tubeRestPosition, smooth);
+
+            // Reload complete, we are back to ready state
+            if (t >= 1) {
+                this.reloadTimer = 0;
+                this.state       = LauncherState.READY;
+            }
+        }
+    }
+
+    updateMissileState(delta, scene) {
+        // Update missile if in flight
+        if (this.missile && this.missile.alive) {
+            const target = this.getSightTarget(scene);
+            const hit    = this.missile.update(delta, target, this.tanks, this.worldObastacles, scene);
+            if (hit || !this.missile.alive) {
+                this.missile = null;
+                this.state   = LauncherState.POST_FIRE;
+            }
+        }
+    }
+
     // Update our launcher's position.
     update(input, delta, scene, terrain) {
         this.scene = scene;
@@ -387,64 +452,12 @@ export class Launcher {
         }
         this.wasReloadDown = reloadDown;
 
-        // Simulate loose tube physics
-        // Stop when it hits the ground
-        if (this.looseTubePhysics) {
-            this.looseTubePhysics.velocity.y -= 12 * delta;
-            this.looseTubePhysics.mesh.position.addScaledVector(this.looseTubePhysics.velocity, delta);
+        // Refactored this section a bit moving individual updates to separate functions
+        this.updateLooseTubePhysics(delta, terrain);
+        this.updateReloadAnimation(delta);
+        this.updateMissileState(delta, scene);
 
-            // Raycast down from tube position to find actual terrain height
-            const tubePos = this.looseTubePhysics.mesh.position;
-            const raycaster = new THREE.Raycaster(
-                new THREE.Vector3(tubePos.x, tubePos.y + 10, tubePos.z),
-                new THREE.Vector3(0, -1, 0)
-            );
-            const hits     = this.terrain ? raycaster.intersectObject(this.terrain, false) : [];
-            const groundY  = hits.length > 0 ? hits[0].point.y : 0;
-
-            const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
-
-            // console.log(box.min.y, groundY);
-            if (box.min.y <= groundY) {
-                this.looseTubePhysics.mesh.position.y += groundY - box.min.y;
-                this.looseTubePhysics.velocity.set(0, 0, 0);
-                this.looseTubePhysics = null;
-
-                if (this.state === LauncherState.TOSSING) {
-                    this.state       = LauncherState.RELOADING;
-                    this.reloadTimer = 0;
-                    this.missileBone.position.set(0, 2, 0);
-                    this.reloadStartPos.copy(this.missileBone.position);
-                    this.tubeMesh.visible = true;
-                }
-            }
-        }
-
-        // Reload animation we lerp the bone position from above down to rest position
-        if (this.state === LauncherState.RELOADING) {
-            this.reloadTimer += delta;
-            const t = Math.min(this.reloadTimer / this.RELOAD_DURATION, 1);
-
-            // Smoothstep for a more natural easing
-            const smooth = t * t * (3 - 2 * t);
-            this.missileBone.position.lerpVectors(this.reloadStartPos, this.tubeRestPosition, smooth);
-
-            // Reload complete, we are back to ready state
-            if (t >= 1) {
-                this.reloadTimer = 0;
-                this.state       = LauncherState.READY;
-            }
-        }
-
-        // Update missile if in flight
-        if (this.missile && this.missile.alive) {
-            const target = this.getSightTarget(scene);
-            const hit    = this.missile.update(delta, target, this.tanks, this.worldObastacles, scene);
-            if (hit || !this.missile.alive) {
-                this.missile = null;
-                this.state   = LauncherState.POST_FIRE;
-            }
-        }
+        
     }
 
     // Add tank to list of our available targets

@@ -226,12 +226,18 @@ export class Tank {
 
     // Update the movement of our tank
     updateMovement(delta) {
+        // Stop if we don't have a path yet
+        if (!this.path || this.path.length === 0) return;
+
+        // Stop once we've reached the end of the path
+        if (this.pathIndex >= this.path.length) return;
+
+        // Guard: waypoint must exist before reading its properties
+        // Catches debug scenes where setNavigation is never called
+        const waypoint = this.path[this.pathIndex];
+        if (!waypoint) return;
 
         let movedThisFrame = false;
-
-        // Follow the current waypoint directly
-        // No corner cutting, less chance to clip trees
-        const waypoint = this.path[this.pathIndex];
 
         // Direction from tank to target point
         const toWaypoint = new THREE.Vector3(

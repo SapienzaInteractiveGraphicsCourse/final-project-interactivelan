@@ -1,14 +1,18 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 
+
 // Number of grass blades over the whole map
-const BLADE_COUNT = 250000;
+const BLADE_COUNT = 25000;
+
 // Blade dimensions
-const BLADE_WIDTH      = 0.36;
+const BLADE_WIDTH = 0.36;
 const BLADE_MIN_HEIGHT = 0.35;
 const BLADE_MAX_HEIGHT = 1.1;
+
 // No grass inside this radius around the launcher, keeps the tripod area clean
 const LAUNCHER_CLEAR_RADIUS = 4;
+
 
 // The vertex shader only handles blade shape
 // Everything static (position, terrain height, blade height, color tint) is baked on the CPU
@@ -42,6 +46,7 @@ const vertexShader = `
     }
 `;
 
+
 // Fragment shader: outputs per vertex grass color
 const fragmentShader = `
     varying vec3 vColor;
@@ -50,43 +55,69 @@ const fragmentShader = `
     }
 `;
 
-// Build the grass geometry with everything static baked in:
-// blade base position sits on the terrain via getHeightAt, height and tint precomputed
-function buildGrassGeometry(count, terrain) {
-    const positions    = [];
-    const colors       = [];
-    const yaws         = [];
-    const bladeHeights = [];
-    const tints        = [];
 
-    const halfMap    = terrain.size / 2;
+
+// Build static grass geometry, placing blades outward from a chosen origin.
+
+function buildGrassGeometry(count, terrain, origin) {
+    const positions = [];
+    const colors = [];
+    const yaws = [];
+    const bladeHeights = [];
+    const tints = [];
+
+    const halfMap = terrain.size / 2;
     const yawUnitVec = new THREE.Vector3();
 
     // CPU noise for density clustering and bald patches, same library as the terrain
     const densityNoise = createNoise2D();
 
+    // Ordered candidate cells let us start near the chosen origin and expand outward
+    const cellSize = 1.25;
+    const cells = [];
+
+    for (let x = -halfMap; x <= halfMap; x += cellSize) {
+        for (let z = -halfMap; z <= halfMap; z += cellSize) {
+            const dx = x - origin.x;
+            const dz = z - origin.z;
+            const distanceSq = dx * dx + dz * dz;
+
+            cells.push({ x, z, distanceSq });
+        }
+    }
+
+    // Closest cells to the origin are evaluated first
+    cells.sort((a, b) => a.distanceSq - b.distanceSq);
+
     const launcherX = terrain.launcherSpawn.x;
     const launcherZ = terrain.launcherSpawn.z;
 
     let placed = 0;
-    while (placed < count) {
-        const x = THREE.MathUtils.randFloat(-halfMap, halfMap);
-        const z = THREE.MathUtils.randFloat(-halfMap, halfMap);
 
-        // Density is the probability a blade grows here, so patches thin out gradually instead of cutting off at a hard noise contour
-        // Skips don't increment placed, rejected samples get retried elsewhere
+    for (const cell of cells) {
+        if (placed >= count) break;
+
+        // Jitter inside each cell so the result stays organic instead of looking grid-aligned
+        const x = cell.x + THREE.MathUtils.randFloatSpread(cellSize);
+        const z = cell.z + THREE.MathUtils.randFloatSpread(cellSize);
+
+        // Keep samples inside terrain bounds after jitter
+        if (x < -halfMap || x > halfMap || z < -halfMap || z > halfMap) continue;
+
+        // Density is the probability a blade grows here, so patches fade in and out naturally
         const density = (densityNoise(x * 0.02, z * 0.02) + 1) / 2;
         if (Math.random() > density * 1.4) continue;
 
-        // Keep the launcher plateau clean
+        // Keep the launcher plateau clean regardless of the placement origin
         const distanceToLauncher = Math.hypot(x - launcherX, z - launcherZ);
         if (distanceToLauncher < LAUNCHER_CLEAR_RADIUS) continue;
 
-        // Blade height varies with the same noise so tall and short grass cluster together
-        const bladeHeight = THREE.MathUtils.lerp(BLADE_MIN_HEIGHT, BLADE_MAX_HEIGHT, density)
-                          * THREE.MathUtils.randFloat(0.8, 1.2);
+        // Blade height follows density so nearby blades cluster into taller and shorter regions
+        const bladeHeight =
+            THREE.MathUtils.lerp(BLADE_MIN_HEIGHT, BLADE_MAX_HEIGHT, density) *
+            THREE.MathUtils.randFloat(0.8, 1.2);
 
-        // Sit slightly into the ground so slopes don't show floating blade bases
+        // Sit slightly into the ground so slopes do not show floating blade bases
         const y = terrain.getHeightAt(x, z) - 0.05;
 
         const yawAngle = Math.random() * Math.PI * 2;
@@ -94,12 +125,12 @@ function buildGrassGeometry(count, terrain) {
 
         const tint = THREE.MathUtils.randFloat(0.7, 1.0);
 
-        // Three vertices: bottom left (r=0.1), bottom right (b=0.1), top (g=1)
-        // All start at the same point, the vertex shader spreads them into a triangle
+        // Three vertices: bottom left, bottom right, top
+        // All start at the same point and the vertex shader spreads them into a blade triangle
         const verts = [
             { color: [0.1, 0, 0] },
             { color: [0, 0, 0.1] },
-            { color: [1, 1, 1]   },
+            { color: [1, 1, 1] },
         ];
 
         verts.forEach(vert => {
@@ -114,31 +145,32 @@ function buildGrassGeometry(count, terrain) {
     }
 
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position',     new THREE.BufferAttribute(new Float32Array(positions),    3));
-    geometry.setAttribute('color',        new THREE.BufferAttribute(new Float32Array(colors),       3));
-    geometry.setAttribute('aYaw',         new THREE.BufferAttribute(new Float32Array(yaws),         3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+    geometry.setAttribute('aYaw', new THREE.BufferAttribute(new Float32Array(yaws), 3));
     geometry.setAttribute('aBladeHeight', new THREE.BufferAttribute(new Float32Array(bladeHeights), 1));
-    geometry.setAttribute('aTint',        new THREE.BufferAttribute(new Float32Array(tints),        1));
+    geometry.setAttribute('aTint', new THREE.BufferAttribute(new Float32Array(tints), 1));
 
     return geometry;
 }
 
-// Create the grass system, fully static
-// Takes the Terrain class instance so heights come from getHeightAt instead of a GPU render
-export function createGrass(scene, terrain) {
-    const geometry = buildGrassGeometry(BLADE_COUNT, terrain);
+
+
+// Create the grass system
+export function createGrass(scene, terrain, origin) {
+    const geometry = buildGrassGeometry(BLADE_COUNT, terrain, origin);
 
     const material = new THREE.ShaderMaterial({
         vertexShader,
         fragmentShader,
         vertexColors: true,
-        side:         THREE.DoubleSide,
+        side: THREE.DoubleSide,
         uniforms: {
             uBladeWidth: { value: BLADE_WIDTH },
         }
     });
 
-    const mesh         = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
     scene.add(mesh);
 

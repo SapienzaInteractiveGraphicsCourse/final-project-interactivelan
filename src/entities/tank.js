@@ -185,9 +185,15 @@ export class Tank {
     }
 
     // Setup navigation for our tank
-    setNavigation(navMap, moveTarget) {
-        this.navMap     = navMap;
-        this.moveTarget = moveTarget.clone();
+    setNavigation(navMap, moveTarget, targetJitter = 8) {
+        this.navMap = navMap;
+
+        // Offset the target slightly so tanks from same spawn dont just go in a conga line to player
+        const jitteredTarget = moveTarget.clone();
+        jitteredTarget.x    += (Math.random() - 0.5) * targetJitter;
+        jitteredTarget.z    += (Math.random() - 0.5) * targetJitter;
+
+        this.moveTarget = jitteredTarget;
         this.refreshPath();
     }
 

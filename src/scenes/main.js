@@ -18,10 +18,19 @@ import { GameAudio, preloadAudio } from '../core/audio.js';
 
 import { runIntro } from '../scenes/intro.js';
 
+import { GameManager } from '../core/game.js';
+import { HUD }                    from '../ui/hud.js';
+
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8cbfff);
+// scene.background = new THREE.Color(0x8cbfff);
+
+// Equirectangular sky texture
+const skyTexture          = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/sky.jpeg`);
+skyTexture.mapping        = THREE.EquirectangularReflectionMapping;
+skyTexture.colorSpace     = THREE.SRGBColorSpace;
+scene.background          = skyTexture;
 
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -52,21 +61,24 @@ window.camera = camera;
 let lastTime = performance.now();
 
 
+// Scene atmosphere
+scene.fog = new THREE.Fog(0x7a8694, 140, 420);
+
 // Lighting
-const sun = new THREE.DirectionalLight(0xfff1e8, 1.2);
-sun.position.set(20, 30, 10);
+const sun = new THREE.DirectionalLight(0xffd6a3, 2.4);
+sun.position.set(55, 38, -25);
 sun.castShadow = true;
 sun.shadow.bias = -0.0005;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 2000;
-sun.shadow.camera.left = -120;
-sun.shadow.camera.right = 120;
-sun.shadow.camera.top = 120;
-sun.shadow.camera.bottom = -120;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 260;
+sun.shadow.camera.left = -140;
+sun.shadow.camera.right = 140;
+sun.shadow.camera.top = 140;
+sun.shadow.camera.bottom = -140;
 
-const hemisphere = new THREE.HemisphereLight(0xddeeff, 0x443322, 0.6);
-const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+const hemisphere = new THREE.HemisphereLight(0x9bbcff, 0x2a221c, 0.38);
+const ambient = new THREE.AmbientLight(0xffffff, 0.05);
 
 scene.add(sun);
 scene.add(hemisphere);
@@ -87,10 +99,6 @@ const launcherModel = await loadModel(`${import.meta.env.BASE_URL}models/launche
 const tankModel = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
 const treeModels = await loadTreeModels();
 
-
-
-
-
 // Terrain
 const terrain = new Terrain(
     500,
@@ -108,7 +116,7 @@ const terrain = new Terrain(
 
 // World setup
 const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.7);
-const grass = createGrass(scene, terrain);
+const grass = createGrass(scene, terrain, terrain.launcherSpawn);
 
 
 worldObstacles.push(terrain.terrain);
@@ -116,6 +124,10 @@ worldObstacles.push(terrain.terrain);
 // Game objects
 const launcher = new Launcher(launcherModel, worldObstacles, gameAudio);
 const tanks = [];
+
+// HUD and game manager 
+const hud         = new HUD();
+const gameManager = new GameManager(terrain, launcher, tanks, addTank, hud);
 
 
 // Resize
@@ -205,10 +217,10 @@ async function init() {
     launcher.setMainCamera();
 
     // Add a tank for each spawnpoint
-    for (const spawn of terrain.enemySpawnPositions) {
-        console.log(spawn);
-        addTank(spawn);
-    }
+    //for (const spawn of terrain.enemySpawnPositions) {
+    //    console.log(spawn);
+    //    addTank(spawn);
+    //}
 
     // visualizeDebugSpawns();
     // visualizeDebugPaths();
@@ -227,6 +239,12 @@ function animate() {
     for (const tank of tanks) {
         tank.update(delta, launcher.activeCamera ?? camera);
     }
+
+    // Gameplay loop: waves, win/lose, HUD
+    gameManager.update(delta);
+
+    // Keep the launcher state indicator current
+    hud.updateLauncherState(launcher.state);
 
     updateExplosions(delta);
 

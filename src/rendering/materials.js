@@ -12,7 +12,7 @@ function loadTex(path) {
 // Let's create a single factory to creature our materials, what we weere doing here was kind of futile
 
 // Generate a PBR Material from our Texture folders
-function makePBR(dir, metalnessOverride = -1){
+function makePBR(dir, metalnessOverride = -1, roughnessOverride = -1) {
     // Build our texture's dir path
     const dirPath = `${import.meta.env.BASE_URL}textures/${dir}`;
 
@@ -22,20 +22,27 @@ function makePBR(dir, metalnessOverride = -1){
         normalMap:    loadTex(`${dirPath}/Normal_OpenGL.png`),
         roughnessMap: loadTex(`${dirPath}/Roughness.png`),
         aoMap:        loadTex(`${dirPath}/AO.png`),
-        metalness:    0.0
-    })
+        metalness:    0.0,
+        roughness:    1.0
+    });
+
     if (metalnessOverride !== -1) {
-        material.metalness = metalnessOverride
+        material.metalness = metalnessOverride;
     }
+
+    if (roughnessOverride !== -1) {
+        material.roughness = roughnessOverride;
+    }
+
     return material;
 }
 
 // Create our materials
 export const materialLauncher = makePBR('launcher');
 export const materialTank = makePBR('tank');
-export const materialTreeA = makePBR('tree_a');
-export const materialTreeB = makePBR('tree_b');
-export const materialTreeC = makePBR('tree_c');
+export const materialTreeA = makePBR('tree_a', 0, 1);
+export const materialTreeB = makePBR('tree_b', 0, 1);
+export const materialTreeC = makePBR('tree_c', 0, 1);
 
 // Our Material Terrain is slightly more complicated
 export const materialTerrain = makePBR('terrain');

@@ -16,6 +16,8 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 import { GameAudio, preloadAudio } from '../core/audio.js';
 
+import { runIntro } from '../scenes/intro.js';
+
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -212,8 +214,7 @@ async function init() {
     // visualizeDebugPaths();
 }
 
-await init();
-
+await runIntro(renderer, camera, init);
 
 // Main loop
 function animate() {

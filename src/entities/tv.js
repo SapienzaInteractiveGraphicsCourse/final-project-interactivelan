@@ -1,20 +1,22 @@
 import * as THREE from 'three';
 import { loadModel } from '../utilities/loader.js';
+import { Transition } from '../ui/transition.js';
 
 // The Television we will use for our intro cutscene.
-export class PocketTV {
+export class TV {
     constructor() {
         this.model        = null;
         this.videoElement = null;
         this.videoTexture = null;
         this.screenMesh   = null;
         this.onEnded      = null;
+        this.onPlaybackStarted = null;
 
         this.started = false;
     }
 
     // Load the TV model and wire up the video texture
-    async load(scene, position = new THREE.Vector3(), modelPath = `${import.meta.env.BASE_URL}models/pocket_tv.glb`) {
+    async load(scene, position = new THREE.Vector3(), modelPath = `${import.meta.env.BASE_URL}models/tv.glb`) {
         this.model = await loadModel(modelPath);
         this.model.position.copy(position);
         scene.add(this.model);
@@ -66,6 +68,7 @@ export class PocketTV {
         try {
             await this.videoElement.play();
             this.started = true;
+            if (this.onPlaybackStarted) this.onPlaybackStarted();
         } catch (error) {
             // Log possible errors
             console.warn(error);
@@ -144,6 +147,12 @@ export class PocketTV {
         });
     }
 
+    skip() {
+        if (!this.videoElement || !this.started) return;
+        this.videoElement.pause();
+        if (this.onEnded) this.onEnded();
+    }
+
     dispose(scene) {
         this.stop();
 
@@ -161,3 +170,4 @@ export class PocketTV {
         this.screenMesh   = null;
     }
 }
+

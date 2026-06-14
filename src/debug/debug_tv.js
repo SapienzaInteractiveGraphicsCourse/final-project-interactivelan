@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { PocketTV } from '../entities/tv.js';
+import { TV } from '../entities/tv.js';
 
 // Debug scene to test the pocket TV model and video playback
 
@@ -42,7 +42,7 @@ window.addEventListener('resize', () => {
 let tv;
 
 async function init() {
-    tv = new PocketTV();
+    tv = new TV();
 
     // Load the TV at the origin 
     await tv.load(scene, new THREE.Vector3(0, 0, 0), `${import.meta.env.BASE_URL}models/tv.glb`);

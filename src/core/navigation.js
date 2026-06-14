@@ -38,8 +38,8 @@ export class NavigationMap {
 
     // Opposite of worldToGrid
     gridToWorld(gridColumn, gridRow) {
-        const worldX = gridColumn * this.cellSize + this.originX;
-        const worldZ = gridRow    * this.cellSize + this.originZ;
+        const worldX = (gridColumn + 0.5) * this.cellSize + this.originX;
+        const worldZ = (gridRow    + 0.5) * this.cellSize + this.originZ;
         return [worldX, worldZ];
     }
 
@@ -232,7 +232,7 @@ export class NavigationMap {
 
             closedSet.add(currentKey);
 
-            // Check all 8 neighbors (4 cardinal + 4 diagonal)
+            // Check all 4 neighbors (4 cardinal)
             for (let columnStep = -1; columnStep <= 1; columnStep++) {
                 for (let rowStep = -1; rowStep <= 1; rowStep++) {
                     if (columnStep === 0 && rowStep === 0) continue;
@@ -243,23 +243,37 @@ export class NavigationMap {
 
                     if (neighborColumn < 0 || neighborColumn >= this.width)  continue;
                     if (neighborRow    < 0 || neighborRow    >= this.height) continue;
-                    if (!this.grid[neighborColumn][neighborRow].passable)     continue;
-                    if (closedSet.has(neighborKey))                           continue;
+                    if (!this.grid[neighborColumn][neighborRow].passable)    continue;
+                    if (closedSet.has(neighborKey))                          continue;
 
-                    // Diagonal movement costs sqrt(2), straight movement costs 1
-                    const isDiagonal  = columnStep !== 0 && rowStep !== 0;
-                    const moveCost    = isDiagonal ? Math.SQRT2 : 1;
+                    const isDiagonal = columnStep !== 0 && rowStep !== 0;
+
+                    // Don't let diagonals squeeze through blocked corners
+                    if (isDiagonal) {
+                        const sideAColumn = current.column + columnStep;
+                        const sideARow    = current.row;
+                        const sideBColumn = current.column;
+                        const sideBRow    = current.row + rowStep;
+
+                        if (!this.grid[sideAColumn][sideARow].passable) continue;
+                        if (!this.grid[sideBColumn][sideBRow].passable) continue;
+                    }
+
+                    const moveCost = isDiagonal ? Math.SQRT2 : 1;
                     const tentativeCost = gCost.get(currentKey) + moveCost;
 
                     if (tentativeCost < (gCost.get(neighborKey) ?? Infinity)) {
                         cameFrom.set(neighborKey, currentKey);
                         gCost.set(neighborKey, tentativeCost);
-                        fCost.set(neighborKey, tentativeCost + estimateCostToGoal(neighborColumn, neighborRow));
+                        fCost.set(
+                            neighborKey,
+                            tentativeCost + estimateCostToGoal(neighborColumn, neighborRow)
+                        );
 
-                        // Only add to open set if not already there
                         const alreadyQueued = openSet.some(
                             node => node.column === neighborColumn && node.row === neighborRow
                         );
+
                         if (!alreadyQueued) {
                             openSet.push({ column: neighborColumn, row: neighborRow });
                         }

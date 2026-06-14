@@ -81,9 +81,6 @@ export class Tank {
         this.turnSpeed       = 1.0;
         this.arrivalRadius   = 4.0;
 
-        this.pathRefreshTimer    = 0;
-        this.pathRefreshInterval = 1.0;
-
         // Stuck detection: if we barely move for long enough, force a repath
         // Catches cases where the tank clips a tree corner and wedges itself
         this.lastKnownPosition = new THREE.Vector3();

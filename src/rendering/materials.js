@@ -20,18 +20,21 @@ function makePBR(dir, metalnessOverride = -1, roughnessOverride = -1) {
     const material =  new THREE.MeshStandardMaterial({
         map:          loadTex(`${dirPath}/Base.png`),
         normalMap:    loadTex(`${dirPath}/Normal_OpenGL.png`),
-        roughnessMap: loadTex(`${dirPath}/Roughness.png`),
-        aoMap:        loadTex(`${dirPath}/AO.png`),
-        metalness:    0.0,
-        roughness:    1.0
+        aoMap:        loadTex(`${dirPath}/AO.png`)
     });
 
     if (metalnessOverride !== -1) {
         material.metalness = metalnessOverride;
     }
+    else {
+        material.metalnessMap = loadTex(`${dirPath}/Metallic.png`)
+    }
 
     if (roughnessOverride !== -1) {
         material.roughness = roughnessOverride;
+    }
+    else {
+        material.roughnessMap = loadTex(`${dirPath}/Roughness.png`)
     }
 
     return material;
@@ -40,9 +43,6 @@ function makePBR(dir, metalnessOverride = -1, roughnessOverride = -1) {
 // Create our materials
 export const materialLauncher = makePBR('launcher');
 export const materialTank = makePBR('tank');
-export const materialTreeA = makePBR('tree_a', 0, 1);
-export const materialTreeB = makePBR('tree_b', 0, 1);
-export const materialTreeC = makePBR('tree_c', 0, 1);
 
 // Our Material Terrain is slightly more complicated
 export const materialTerrain = makePBR('terrain');

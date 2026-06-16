@@ -106,27 +106,27 @@ const sandbags = new Prop(sandbagModel);
 
 // Terrain
 const terrain = new Terrain(
-    400,
+    320,
     100,
     0.005,
     8,
-    new THREE.Vector3(150, 0, 150),
+    new THREE.Vector3(140, 0, 140),
     [
-        new THREE.Vector3(-180, 0, -90),
-        new THREE.Vector3(-180, 0, -80),
-        new THREE.Vector3(-180, 0, -180),
-        new THREE.Vector3(0, 0, -180),
-        new THREE.Vector3(10, 0, -180),
-        new THREE.Vector3(30, 0, -180),
-        new THREE.Vector3(-180, 0, 0),
-        new THREE.Vector3(-180, 0, 10),
-        new THREE.Vector3(-180, 0, 30),
+        new THREE.Vector3(-140, 0, -90),
+        new THREE.Vector3(-135, 0, -70),
+        new THREE.Vector3(-130, 0, -140),
+        new THREE.Vector3(0, 0, -140),
+        new THREE.Vector3(10, 0, -140),
+        new THREE.Vector3(30, 0, -140),
+        new THREE.Vector3(-140, 0, 0),
+        new THREE.Vector3(-140, 0, 10),
+        new THREE.Vector3(-140, 0, 30),
     ]
 );
 
 
 // World setup
-const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.5);
+const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.55);
 const grassModels = await loadGrassModels();
 const grass = createGrass(scene, terrain, grassModels, 0.5, 2.5);
 
@@ -222,16 +222,16 @@ async function init() {
     terrain.addToScene(scene);
 
     launcher.addToScene(scene, terrain.launcherSpawn);
-    sandbags.addToScene(
-        scene,
-        new THREE.Vector3(
-            terrain.launcherSpawn.x - 2,
-            terrain.launcherSpawn.y,
-            terrain.launcherSpawn.z - 2
-        ),
-        new THREE.Euler(0, Math.PI * 0.25, 0),
-        0.75
-    );
+    //sandbags.addToScene(
+    //    scene,
+    //    new THREE.Vector3(
+    //        terrain.launcherSpawn.x - 2,
+    //        terrain.launcherSpawn.y - 0.35,
+    //        terrain.launcherSpawn.z - 2
+    //    ),
+    //    new THREE.Euler(0, Math.PI * 0.25, 0),
+    //    0.75
+    //);
 
     // Make rotation limits relative to the map center (0,0,0)
     launcher.setMapCenter(new THREE.Vector3(0, 0, 0));

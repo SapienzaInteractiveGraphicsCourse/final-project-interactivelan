@@ -3,6 +3,7 @@ import { applyCellShading } from '../rendering/shaders.js';
 import { spawnExplosion, createFire, createSmoke } from '../rendering/effects.js';
 import { materialTank } from '../rendering/materials.js';
 
+
 // Let's define some states for our tank
 export const TankState = Object.freeze({
     // Tank is moving and operational
@@ -14,6 +15,7 @@ export const TankState = Object.freeze({
     // Tank is a static wreck
     DEAD:    'DEAD',
 });
+
 
 export class Tank {
     constructor(model, gameAudio = null) {
@@ -86,6 +88,19 @@ export class Tank {
         this.lastKnownPosition = new THREE.Vector3();
         this.stuckTimer        = 0;
         this.stuckThreshold    = 1.5;
+
+        this.pathRefreshTimer = 0;
+        this.pathRefreshInterval = 1.0;
+
+        this.hitMoveDuration = 0.9;
+        this.hitMoveSpeedMultiplier = 0.45;
+        this.hitSteerMultiplier = 0.35;
+        this.hitAimLocked = false;
+
+        this.hullFire = null;
+        this.hullSmoke = null;
+        this.hullFireStarted = false;
+        this.hullFireDelay = 0.28;
 
         // Search for expected bones in loaded model
         // Our model should have:
@@ -227,8 +242,22 @@ export class Tank {
         this.pathIndex = this.path.length > 1 ? 1 : 0;
     }
 
+    getHullFirePosition() {
+        const firePos = new THREE.Vector3();
+
+        if (this.hullBone) {
+            this.hullBone.getWorldPosition(firePos);
+            firePos.y += 0.8;
+        } else {
+            firePos.copy(this.group.position);
+            firePos.y += this.groundOffset + 0.8;
+        }
+
+        return firePos;
+    }
+
     // Update the movement of our tank
-    updateMovement(delta) {
+    updateMovement(delta, speedMultiplier = 1.0, turnMultiplier = 1.0) {
         // Stop if we don't have a path yet
         if (!this.path || this.path.length === 0) return;
 
@@ -270,7 +299,7 @@ export class Tank {
         while (yawDifference < -Math.PI) yawDifference += Math.PI * 2;
 
         // Limit how much we can turn this frame
-        const maxTurnThisFrame = this.turnSpeed * delta;
+        const maxTurnThisFrame = this.turnSpeed * turnMultiplier * delta;
         this.group.rotation.y += THREE.MathUtils.clamp(yawDifference, -maxTurnThisFrame, maxTurnThisFrame);
 
         // Calculate forward direction from current hull rotation
@@ -290,7 +319,7 @@ export class Tank {
         // Also slow down a bit when we are very close to the waypoint
         // Helps avoid overshooting and makes the turn-in feel softer
         const approachFactor = THREE.MathUtils.clamp(distanceToWaypoint / 6, 0.35, 1.0);
-        const moveStep       = this.moveSpeed * turnFactor * approachFactor * delta;
+        const moveStep = this.moveSpeed * speedMultiplier * turnFactor * approachFactor * delta;
 
         // If we are facing way off target, mostly rotate first and crawl forward
         // This feels more tank-like than sliding through the turn
@@ -408,16 +437,11 @@ export class Tank {
 
         this.state      = TankState.HIT;
         this.stateTimer = 0;
-        this.setMoveSoundVolume(0.0, 0.08);
+        this.hullFireStarted = false;
+        this.setMoveSoundVolume(0.08, 0.2);
 
         // Main blast
         spawnExplosion(this.scene, hitPosition, 60, 2.4);
-
-        // Add immediate fire and smoke at impact point
-        if (!this.fire) {
-            this.fire  = createFire(this.scene, hitPosition, camera, 1.6);
-            this.smoke = createSmoke(this.scene, hitPosition, camera, 2.2);
-        }
 
         // Small secondary blast for extra punch
         setTimeout(() => {
@@ -525,13 +549,29 @@ export class Tank {
                 if (this.moveTarget) this.aimAt(this.moveTarget);
                 break;
 
-            case TankState.HIT:
-                // Short pause before transitioning to death state
-                if (this.stateTimer > 0.3) {
-                    this.state      = this.rollDeathType();
+            case TankState.HIT: {
+                const timer = THREE.MathUtils.clamp(this.stateTimer / this.hitMoveDuration, 0, 1);
+                const speedMul = THREE.MathUtils.lerp(this.hitMoveSpeedMultiplier, 0.08, timer);
+                const turnMul  = THREE.MathUtils.lerp(this.hitSteerMultiplier, 0.15, timer);
+
+                if (!this.hullFireStarted && this.stateTimer >= this.hullFireDelay) {
+                    const hullFirePos = this.getHullFirePosition();
+                    this.hullFire  = createFire(this.scene, hullFirePos, camera, 1.1);
+                    this.hullSmoke = createSmoke(this.scene, hullFirePos, camera, 1.4);
+                    this.hullFireStarted = true;
+                }
+
+                this.hullFire?.update(delta, camera);
+                this.hullSmoke?.update(delta, camera);
+
+                this.updateMovement(delta, speedMul, turnMul);
+
+                if (this.stateTimer > this.hitMoveDuration) {
+                    this.state = this.rollDeathType();
                     this.stateTimer = 0;
                 }
                 break;
+            }
 
             // const inside a case needs its own block scope or strict mode complains
             case TankState.COOKOFF: {
@@ -540,13 +580,15 @@ export class Tank {
                 this.turretBone.getWorldPosition(firePos);
 
                 if (!this.fire) {
-                    this.fire  = createFire(this.scene, firePos, camera);
-                    this.smoke = createSmoke(this.scene, firePos, camera);
+                    this.fire  = createFire(this.scene, firePos, camera, 24, 1.5, 5, 0.1,0.5);
+                    this.smoke = createSmoke(this.scene, firePos, camera, 12, 2.5, 8, 0.3, 0.7);
                 }
 
                 // Update effects each frame
                 this.fire?.update(delta, camera);
                 this.smoke?.update(delta, camera);
+                this.hullFire?.update(delta, camera);
+                this.hullSmoke?.update(delta, camera);
 
                 if (this.stateTimer > 2.0) {
                     this.setMoveSoundVolume(0.0, 0.08);
@@ -567,6 +609,8 @@ export class Tank {
                 // Update effects each frame
                 this.fire?.update(delta, camera);
                 this.smoke?.update(delta, camera);
+                this.hullFire?.update(delta, camera);
+                this.hullSmoke?.update(delta, camera);
 
                 // Lerp gun down to sag position
                 if (this.gunBone) {
@@ -589,8 +633,12 @@ export class Tank {
         // Clean up fire and smoke effects
         this.fire?.destroy();
         this.smoke?.destroy();
-        this.fire  = null;
-        this.smoke = null;
+        this.hullFire?.destroy();
+        this.hullSmoke?.destroy();
+        this.fire      = null;
+        this.smoke     = null;
+        this.hullFire  = null;
+        this.hullSmoke = null;
 
         // Remove group from scene
         this.scene.remove(this.group);

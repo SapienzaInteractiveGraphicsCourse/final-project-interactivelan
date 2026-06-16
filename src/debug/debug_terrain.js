@@ -150,7 +150,7 @@ async function init() {
     const treeModels = await loadTreeModels();
 
     // Place trees on terrain
-    placeTrees(scene, terrain, treeModels, 3, 0.6);
+    await placeTrees(scene, terrain, treeModels, 3, 0.55);
 
     // Create grass 
     createGrass(scene, terrain, grassModels, 0.75, 0.7);

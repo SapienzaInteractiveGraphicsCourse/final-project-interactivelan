@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 
-import { loadModel, loadTreeModels } from '../utilities/loader.js';
+import { loadModel, loadTreeModels, loadGrassModels } from '../utilities/loader.js';
 
 import { Launcher } from '../entities/launcher.js';
-import { Tank } from '../entities/tank.js';
+import { Tank, TankState } from '../entities/tank.js';
+
+import { Prop, loadSandbags } from '../entities/prop.js'
 
 import { InputHandler } from '../core/input.js';
 import { Terrain } from '../core/terrain.js';
@@ -99,24 +101,34 @@ const launcherModel = await loadModel(`${import.meta.env.BASE_URL}models/launche
 const tankModel = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
 const treeModels = await loadTreeModels();
 
+const sandbagModel = await loadSandbags();
+const sandbags = new Prop(sandbagModel);
+
 // Terrain
 const terrain = new Terrain(
-    500,
-    120,
+    400,
+    100,
     0.005,
-    4,
-    new THREE.Vector3(200, 0, 200),
+    8,
+    new THREE.Vector3(150, 0, 150),
     [
-        new THREE.Vector3(-200, 0, -200),
-        new THREE.Vector3(0, 0, -200),
-        new THREE.Vector3(-200, 0, 0),
+        new THREE.Vector3(-180, 0, -90),
+        new THREE.Vector3(-180, 0, -80),
+        new THREE.Vector3(-180, 0, -180),
+        new THREE.Vector3(0, 0, -180),
+        new THREE.Vector3(10, 0, -180),
+        new THREE.Vector3(30, 0, -180),
+        new THREE.Vector3(-180, 0, 0),
+        new THREE.Vector3(-180, 0, 10),
+        new THREE.Vector3(-180, 0, 30),
     ]
 );
 
 
 // World setup
-const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.7);
-const grass = createGrass(scene, terrain, terrain.launcherSpawn);
+const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.5);
+const grassModels = await loadGrassModels();
+const grass = createGrass(scene, terrain, grassModels, 0.5, 2.5);
 
 
 worldObstacles.push(terrain.terrain);
@@ -208,13 +220,26 @@ function visualizeDebugSpawns() {
 // Init
 async function init() {
     terrain.addToScene(scene);
-    terrain.terrain.updateMatrixWorld(true);
 
     launcher.addToScene(scene, terrain.launcherSpawn);
+    sandbags.addToScene(
+        scene,
+        new THREE.Vector3(
+            terrain.launcherSpawn.x - 2,
+            terrain.launcherSpawn.y,
+            terrain.launcherSpawn.z - 2
+        ),
+        new THREE.Euler(0, Math.PI * 0.25, 0),
+        0.75
+    );
+
     // Make rotation limits relative to the map center (0,0,0)
     launcher.setMapCenter(new THREE.Vector3(0, 0, 0));
     launcher.faceToward(new THREE.Vector3(0, 0, 0));
     launcher.setMainCamera();
+
+    terrain.terrain.updateMatrixWorld(true);
+
 
     // Add a tank for each spawnpoint
     //for (const spawn of terrain.enemySpawnPositions) {
@@ -237,7 +262,13 @@ function animate() {
     launcher.update(input, delta, scene, terrain.terrain);
 
     for (const tank of tanks) {
+        // Did our tank die? If so set 
+        const wasDead = tank.state === TankState.DEAD;
         tank.update(delta, launcher.activeCamera ?? camera);
+        if (!wasDead && tank.state === TankState.DEAD) {
+            // Pass reference to dead tank so that we can add it's position to the navmap as blocked
+            gameManager.onTankDestroyed(tank);
+        }
     }
 
     // Gameplay loop: waves, win/lose, HUD

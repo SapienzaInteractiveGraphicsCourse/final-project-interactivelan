@@ -47,6 +47,10 @@ export async function placeTrees(
         const edgeDistX = Math.abs(x) / (terrainSize / 2);
         const edgeDistZ = Math.abs(z) / (terrainSize / 2);
         const edgeBias = Math.pow(Math.max(edgeDistX, edgeDistZ), 8);
+        // Bias toward protected corridor edges instead of map edges
+
+        const nearCorridorEdge = protectedCells?.has(navigationMap.cellKey(x, z)) ? 0 : 1;
+        combined += nearCorridorEdge * 0.01;
         combined += edgeBias * 0.35;
 
         if (combined < threshold) continue;

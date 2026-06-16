@@ -7,7 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Use the new Terrain class
 import { Terrain } from '../core/terrain.js';
 import { placeTrees } from '../core/clutter.js';
-import { loadTreeModels } from '../utilities/loader.js';
+import { loadTreeModels, loadGrassModels } from '../utilities/loader.js';
 import { createGrass } from '../core/grass.js';
 
 const scene = new THREE.Scene();
@@ -69,6 +69,7 @@ let navMapVisible = false;
 let navMapMeshes  = [];
 let navMap;
 let terrain;
+// const grassModels = await loadGrassModels();
 
 // If N is pressed, show the generated navMap
 window.addEventListener('keydown', (e) => {
@@ -152,7 +153,7 @@ async function init() {
     placeTrees(scene, terrain, treeModels, 3, 0.6);
 
     // Create grass 
-    createGrass(scene, terrain);
+    // createGrass(scene, terrain, grassModels, 0.75, 0.7);
 }
 
 init();

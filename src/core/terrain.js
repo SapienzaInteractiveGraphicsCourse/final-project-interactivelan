@@ -80,6 +80,46 @@ export class Terrain {
             this.heights[i] = y;
         }
 
+        // Vertex color variation, to make our world look more alive
+        const colorBuffer = new Float32Array(this.vertCount * 3);
+        const colorNoise = createNoise2D();
+
+        for (let i = 0; i < this.vertCount; i++) {
+            const x = this.geometry.attributes.position.getX(i);
+            const y = this.geometry.attributes.position.getY(i);
+            const z = this.geometry.attributes.position.getZ(i);
+
+            const n = (colorNoise(x * 0.02, z * 0.02) + 1) * 0.5;
+
+            // Normalize height into 0..1 range
+            const h = THREE.MathUtils.clamp((y + amplitude) / (2 * amplitude), 0, 1);
+
+            let r, g, b;
+
+            if (h < 0.35) {
+                // low ground: dirt
+                r = 0.45 + n * 0.08;
+                g = 0.36 + n * 0.06;
+                b = 0.24 + n * 0.05;
+            } else if (h < 0.7) {
+                // mid ground: grass
+                r = 0.32 + n * 0.06;
+                g = 0.50 + n * 0.10;
+                b = 0.22 + n * 0.05;
+            } else {
+                // high ground: dry rock
+                r = 0.5 + n * 0.06;
+                g = 0.48 + n * 0.06;
+                b = 0.42 + n * 0.05;
+            }
+
+            colorBuffer[i * 3] = r;
+            colorBuffer[i * 3 + 1] = g;
+            colorBuffer[i * 3 + 2] = b;
+        }
+
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(colorBuffer, 3));
+
         this.geometry.attributes.position.needsUpdate = true;
         this.geometry.computeVertexNormals();
 
@@ -96,6 +136,29 @@ export class Terrain {
 
         // Find a better launcher spawn than the raw input
         this.launcherSpawn = this.findSuitableLauncherSpawn(this.launcherPosition);
+
+        // After findSuitableLauncherSpawn, punch the hill up a bit more so it reads clearly
+        const hillBoostRadius = 40;
+        const hillBoostAmount = 3;
+
+        for (let i = 0; i < this.vertCount; i++) {
+            const x = this.geometry.attributes.position.getX(i);
+            const z = this.geometry.attributes.position.getZ(i);
+
+            const distToSpawn     = Math.hypot(x - this.launcherSpawn.x, z - this.launcherSpawn.z);
+            const normalizedDist  = 1.0 - THREE.MathUtils.clamp(distToSpawn / hillBoostRadius, 0, 1);
+            const boost           = normalizedDist * normalizedDist * hillBoostAmount;
+
+            const newY = this.heights[i] + boost;
+            this.heights[i] = newY;
+            this.geometry.attributes.position.setY(i, newY);
+        }
+
+        this.geometry.attributes.position.needsUpdate = true;
+        this.geometry.computeVertexNormals();
+
+        // Update launcher spawn Y to the boosted height
+        this.launcherSpawn.y = this.getHeightAt(this.launcherSpawn.x, this.launcherSpawn.z);
 
         // Compute our protected cells after terrain generation
         this.protectedCells = this.computeProtectedCells();
@@ -204,6 +267,47 @@ export class Terrain {
         return true;
     }
 
+    scoreSightlines(candidateX, candidateZ, candidateY) {
+        if (!this.protectedCells || !this.enemySpawnPositions) return 0;
+
+        let visiblePoints = 0;
+        let totalPoints   = 0;
+
+        for (const spawn of this.enemySpawnPositions) {
+            const path = this.navMap.findPath(
+                { x: candidateX, z: candidateZ },
+                spawn
+            );
+            if (path.length === 0) continue;
+
+            // Sample every few points along the path
+            for (let i = 0; i < path.length; i += 3) {
+                const point = path[i];
+                totalPoints++;
+
+                // Walk from candidate to path point, check nothing blocks LOS
+                const steps   = 12;
+                let blocked   = false;
+                for (let s = 1; s < steps; s++) {
+                    const t  = s / steps;
+                    const sx = candidateX + (point.x - candidateX) * t;
+                    const sz = candidateZ + (point.z - candidateZ) * t;
+
+                    // Height of the line of sight at this point
+                    // Launcher eye is 2 units above ground, tank is 1 unit above ground
+                    const losHeight  = (candidateY + 2) + ((this.getHeightAt(point.x, point.z) + 1) - (candidateY + 2)) * t;
+                    const groundHere = this.getHeightAt(sx, sz);
+
+                    if (groundHere > losHeight) { blocked = true; break; }
+                }
+
+                if (!blocked) visiblePoints++;
+            }
+        }
+
+        return totalPoints > 0 ? visiblePoints / totalPoints : 0;
+    }
+
     // Score how good a launcher position is
     evaluateLauncherCandidate(x, z) {
         // Don't place it too close to the edges
@@ -275,6 +379,10 @@ export class Terrain {
         score -= localRelief * 3.0;
         score -= valleyPenalty * 8.0;
         score -= distanceFromHint * 0.05;
+
+        // Sightline coverage
+        const sightlineCoverage = this.scoreSightlines(x, z, centerY);
+        score += sightlineCoverage * 15.0;
 
         return score;
     }

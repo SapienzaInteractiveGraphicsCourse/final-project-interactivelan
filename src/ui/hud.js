@@ -8,6 +8,7 @@ export class HUD {
         this.stateElement        = null;
 
         this.buildWaveCounter();
+        this.buildScore();
         this.buildStateIndicator();
     }
 
@@ -26,6 +27,23 @@ export class HUD {
             pointer-events: none;
         `;
         document.body.appendChild(this.waveCounterElement);
+    }
+
+    buildScore() {
+        this.scoreElement = document.createElement('div');
+        this.scoreElement.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 24px;
+            color: white;
+            font-family: monospace;
+            font-size: 1rem;
+            text-shadow: 0 0 6px black;
+            z-index: 150;
+            pointer-events: none;
+        `;
+        this.scoreElement.textContent = 'KILLS: 0';
+        document.body.appendChild(this.scoreElement);
     }
 
     buildStateIndicator() {
@@ -66,6 +84,12 @@ export class HUD {
         };
 
         this.stateElement.textContent = labels[stateName] ?? stateName;
+    }
+
+    // Update the score counter
+    updateScore(score) {
+        if (!this.scoreElement) return;
+        this.scoreElement.textContent = `KILLS: ${score}`;
     }
 
     // Announcement text on top screen, disappears quickly

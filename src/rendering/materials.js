@@ -67,3 +67,4 @@ materialTerrain.aoMap.wrapT = THREE.RepeatWrapping;
 
 // Make the terrain normals stronger so light shows more surface detail
 materialTerrain.normalScale = new THREE.Vector2(2.0, 2.0);
+materialTerrain.vertexColors = true; 

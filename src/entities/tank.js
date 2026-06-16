@@ -78,7 +78,7 @@ export class Tank {
         this.pathIndex  = 0;
 
         this.moveSpeed       = 6;
-        this.turnSpeed       = 1.0;
+        this.turnSpeed       = 0.5;
         this.arrivalRadius   = 4.0;
 
         // Stuck detection: if we barely move for long enough, force a repath
@@ -299,6 +299,48 @@ export class Tank {
 
         // Keep it on the ground after moving
         if (this.terrain) this.snapToGround(this.terrain);
+
+        // After snapToGround, tilt the tank to match the terrain slope
+        if (this.terrain) {
+            this.snapToGround(this.terrain);
+
+            // Sample terrain a short distance ahead and behind along the facing direction
+            const sampleDistance = 2.0;
+            const forwardX = this.group.position.x + Math.sin(this.group.rotation.y) * sampleDistance;
+            const forwardZ = this.group.position.z + Math.cos(this.group.rotation.y) * sampleDistance;
+            const backX    = this.group.position.x - Math.sin(this.group.rotation.y) * sampleDistance;
+            const backZ    = this.group.position.z - Math.cos(this.group.rotation.y) * sampleDistance;
+
+            const heightAhead  = this.terrain.getHeightAt(forwardX, forwardZ);
+            const heightBehind = this.terrain.getHeightAt(backX, backZ);
+
+            // Angle between the two sample points gives us the pitch
+            const slopePitch = Math.atan2(heightAhead - heightBehind, sampleDistance * 2);
+
+            // Smooth the pitch so it doesn't snap instantly
+            this.group.rotation.x = THREE.MathUtils.lerp(
+                this.group.rotation.x,
+                -slopePitch,
+                0.1
+            );
+
+            // Also sample left and right for side roll
+            const rightX = this.group.position.x + Math.cos(this.group.rotation.y) * sampleDistance;
+            const rightZ = this.group.position.z - Math.sin(this.group.rotation.y) * sampleDistance;
+            const leftX  = this.group.position.x - Math.cos(this.group.rotation.y) * sampleDistance;
+            const leftZ  = this.group.position.z + Math.sin(this.group.rotation.y) * sampleDistance;
+
+            const heightRight = this.terrain.getHeightAt(rightX, rightZ);
+            const heightLeft  = this.terrain.getHeightAt(leftX, leftZ);
+
+            const slopeRoll = Math.atan2(heightRight - heightLeft, sampleDistance * 2);
+
+            this.group.rotation.z = THREE.MathUtils.lerp(
+                this.group.rotation.z,
+                slopeRoll,
+                0.1
+            );
+        }
 
         // Fade movement sound depending on whether the tank is actually moving
         if (this.moveSound) {

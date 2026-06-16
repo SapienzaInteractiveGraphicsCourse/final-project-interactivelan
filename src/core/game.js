@@ -12,9 +12,9 @@ const GameState = Object.freeze({
 // Each wave lists which spawn indices to use and how long after the previous wave to wait
 // spawnIndices refer to the terrain.enemySpawnPositions array
 const WAVE_DEFINITIONS = [
-    { delay: 1,  spawnIndices: [1] },
-    { delay: 1, spawnIndices: [0, 2] },
-    { delay: 1, spawnIndices: [0, 1, 2] },
+    { delay: 1,  spawnIndices: [0, 8] },
+    { delay: 1, spawnIndices: [1, 7, 3] },
+    { delay: 1, spawnIndices: [2, 4, 5, 6 ] },
 ];
 
 // Our class to handle, well, the game logic
@@ -80,9 +80,16 @@ export class GameManager {
     }
 
     // A tank just died — add a point and tell the HUD
-    onTankDestroyed() {
+    onTankDestroyed(tank) {
         this.score++;
         this.hud.updateScore(this.score);
+
+        // Make sure no other tank can cross through the dead tank
+        this.terrain.navMap.setBlocked(
+        tank.group.position.x,
+        tank.group.position.z,
+        2
+    );
     }
 
     // Check for win and lose conditions

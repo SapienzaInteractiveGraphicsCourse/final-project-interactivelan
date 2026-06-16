@@ -69,7 +69,7 @@ let navMapVisible = false;
 let navMapMeshes  = [];
 let navMap;
 let terrain;
-// const grassModels = await loadGrassModels();
+const grassModels = await loadGrassModels();
 
 // If N is pressed, show the generated navMap
 window.addEventListener('keydown', (e) => {
@@ -153,7 +153,7 @@ async function init() {
     placeTrees(scene, terrain, treeModels, 3, 0.6);
 
     // Create grass 
-    // createGrass(scene, terrain, grassModels, 0.75, 0.7);
+    createGrass(scene, terrain, grassModels, 0.75, 0.7);
 }
 
 init();

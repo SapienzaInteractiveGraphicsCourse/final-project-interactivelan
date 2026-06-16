@@ -17,7 +17,8 @@ export async function loadTreeModels() {
     return Promise.all([
         loadModel(`${import.meta.env.BASE_URL}models/tree_a.glb`),
         loadModel(`${import.meta.env.BASE_URL}models/tree_b.glb`),
-        loadModel(`${import.meta.env.BASE_URL}models/tree_c.glb`)
+        loadModel(`${import.meta.env.BASE_URL}models/tree_c.glb`),
+        loadModel(`${import.meta.env.BASE_URL}models/tree_d.glb`)
     ]);
 }
 

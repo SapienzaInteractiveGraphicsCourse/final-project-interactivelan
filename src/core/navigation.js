@@ -75,7 +75,7 @@ export class NavigationMap {
     // Find the nearest passable cell to a world position
     // Used before pathfinding so we never start from inside a blocked cell
     // (e.g. a tank that clipped into a tree's blocked zone)
-    findNearestPassable(worldX, worldZ, searchRadius = 3) {
+    findNearestPassable(worldX, worldZ, searchRadius = 10) {
         const [startColumn, startRow] = this.worldToGrid(worldX, worldZ);
 
         // Already passable — return the original position as-is
@@ -282,7 +282,7 @@ export class NavigationMap {
             }
         }
 
-        // Exhausted all options — no path exists
+        // Exhausted all options
         return [];
     }
 }

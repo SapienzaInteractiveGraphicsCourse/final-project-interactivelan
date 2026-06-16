@@ -53,7 +53,23 @@ export class Missile {
         }
     }
 
+    // Check collision against tree positions
+    checkTreeCollisions(treePositions) {
+        for (const tree of treePositions) {
+            const dx = this.position.x - tree.x;
+            const dz = this.position.z - tree.z;
+            const dy = this.position.y - (tree.y + 2); // check against trunk mid-height
+            const distXZ = Math.sqrt(dx * dx + dz * dz);
+
+            if (distXZ < tree.radius && Math.abs(dy) < 3) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     update(delta, targetPoint, tanks, collidables, scene) {
+        console.log('worldObstacles count:', collidables.length);
         if (!this.alive) return false;
 
         if (this.controlled && targetPoint) {
@@ -74,7 +90,7 @@ export class Missile {
         // Raycast against terrain / trees / world obstacles before moving
         if (collidables && collidables.length > 0 && stepDistance > 0) {
             this.raycaster.set(previousPosition, moveDirection);
-            this.raycaster.far = stepDistance;
+            this.raycaster.far = stepDistance + 2.0;
 
             const intersections = this.raycaster.intersectObjects(collidables, true);
 
@@ -123,49 +139,49 @@ export class Missile {
         return false;
     }
 
-destroy(scene) {
-    if (!this.alive) return;
+    destroy(scene) {
+        if (!this.alive) return;
 
-    // Stop the missile flight sound since the missile no longer exists
-    if (this.flightSound && this.flightSound.isPlaying) {
-        this.flightSound.stop();
-    }
-
-    // Spawn a one-shot explosion sound at the missile's last known position
-    if (this.gameAudio) {
-        const explosionSound = this.gameAudio.createPositional('missileExplosion', {
-            loop: false,
-            volume: 0.5,
-            refDistance: 45,
-            rolloffFactor: 1.0,
-            maxDistance: 300,
-            distanceModel: 'inverse',
-        });
-
-        if (explosionSound) {
-            const explosionAnchor = new THREE.Object3D();
-            explosionAnchor.position.copy(this.position);
-            scene.add(explosionAnchor);
-            explosionAnchor.add(explosionSound);
-            explosionSound.play();
-
-            // Remove the temporary sound node after playback finishes
-            const duration = explosionSound.buffer ? explosionSound.buffer.duration : 2;
-            setTimeout(() => {
-                if (explosionSound.isPlaying) {
-                    explosionSound.stop();
-                }
-                scene.remove(explosionAnchor);
-            }, duration * 1000);
+        // Stop the missile flight sound since the missile no longer exists
+        if (this.flightSound && this.flightSound.isPlaying) {
+            this.flightSound.stop();
         }
-    }
 
-    // Remove mesh from scene
-    if (this.mesh) {
-        scene.remove(this.mesh);
-    }
+        // Spawn a one-shot explosion sound at the missile's last known position
+        if (this.gameAudio) {
+            const explosionSound = this.gameAudio.createPositional('missileExplosion', {
+                loop: false,
+                volume: 0.5,
+                refDistance: 45,
+                rolloffFactor: 1.0,
+                maxDistance: 300,
+                distanceModel: 'inverse',
+            });
 
-    this.alive = false;
+            if (explosionSound) {
+                const explosionAnchor = new THREE.Object3D();
+                explosionAnchor.position.copy(this.position);
+                scene.add(explosionAnchor);
+                explosionAnchor.add(explosionSound);
+                explosionSound.play();
+
+                // Remove the temporary sound node after playback finishes
+                const duration = explosionSound.buffer ? explosionSound.buffer.duration : 2;
+                setTimeout(() => {
+                    if (explosionSound.isPlaying) {
+                        explosionSound.stop();
+                    }
+                    scene.remove(explosionAnchor);
+                }, duration * 1000);
+            }
+        }
+
+        // Remove mesh from scene
+        if (this.mesh) {
+            scene.remove(this.mesh);
+        }
+
+        this.alive = false;
     }
 
 }

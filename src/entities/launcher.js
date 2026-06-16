@@ -76,7 +76,7 @@ export class Launcher {
         this.tanks   = [];
 
         // Reload animation duration in seconds
-        this.RELOAD_DURATION = 1;
+        this.RELOAD_DURATION = 2;
         this.reloadTimer     = 0;
 
         // Bone aim state

@@ -4,14 +4,13 @@ import { spawnExplosion } from '../rendering/effects.js';
 const SPEED = 100;
 const GUIDANCE_FACTOR = 2.5;
 const MAX_RANGE = 550;
-const TRAIL_INTERVAL = 0.03;
-const TRAIL_COLORS = [0x888888, 0x666666, 0x444444, 0x999999];
+const TRAIL_INTERVAL    = 0.03;
+const FIRE_TRAIL_COLORS = [0xff4500, 0xff6a00, 0xffaa00, 0xff8c00];
 
 export class Missile {
     constructor(spawnPosition, spawnDirection, gameAudio = null) {
         this.distanceTravelled = 0;
-        this.alive = true;
-        this.active = false;
+        this.alive      = true;
         this.controlled = true;
 
         this.gameAudio = gameAudio;
@@ -34,7 +33,6 @@ export class Missile {
     addToScene(scene) {
         scene.add(this.mesh);
 
-
         if (this.gameAudio) {
             this.flightSound = this.gameAudio.createPositional('launcherFire', {
                 loop: false,
@@ -53,23 +51,7 @@ export class Missile {
         }
     }
 
-    // Check collision against tree positions
-    checkTreeCollisions(treePositions) {
-        for (const tree of treePositions) {
-            const dx = this.position.x - tree.x;
-            const dz = this.position.z - tree.z;
-            const dy = this.position.y - (tree.y + 2); // check against trunk mid-height
-            const distXZ = Math.sqrt(dx * dx + dz * dz);
-
-            if (distXZ < tree.radius && Math.abs(dy) < 3) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     update(delta, targetPoint, tanks, collidables, scene) {
-        console.log('worldObstacles count:', collidables.length);
         if (!this.alive) return false;
 
         if (this.controlled && targetPoint) {
@@ -117,7 +99,7 @@ export class Missile {
         this.trailTimer += delta;
         if (this.trailTimer >= TRAIL_INTERVAL) {
             this.trailTimer = 0;
-            spawnExplosion(scene, this.position.clone(), 3, 0.2, TRAIL_COLORS);
+            spawnExplosion(scene, this.position.clone(), 2, 0.1, FIRE_TRAIL_COLORS);
         }
 
         // Self detonation after max range

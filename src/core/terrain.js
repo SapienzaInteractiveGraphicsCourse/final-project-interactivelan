@@ -268,7 +268,6 @@ export class Terrain {
         );
     }
 
-    // Self explainatory
     isFarEnoughFromEnemySpawns(point) {
         for (const spawn of this.enemySpawnPositions) {
             if (point.distanceTo(spawn) < this.MIN_LAUNCHER_ENEMY_DISTANCE) return false;
@@ -396,10 +395,4 @@ export class Terrain {
         scene.add(this.terrain);
     }
 
-    getSpawnData() {
-        return {
-            launcherSpawn: this.launcherSpawn.clone(),
-            enemySpawns:   this.enemySpawnPositions.map(spawn => spawn.clone())
-        };
-    }
 }

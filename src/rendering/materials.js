@@ -9,9 +9,7 @@ function loadTex(path) {
     return texture;
 }
 
-// Let's create a single factory to creature our materials, what we weere doing here was kind of futile
-
-// Generate a PBR Material from our Texture folders
+// Generate a PBR material from a texture folder
 function makePBR(dir, metalnessOverride = -1, roughnessOverride = -1) {
     // Build our texture's dir path
     const dirPath = `${import.meta.env.BASE_URL}textures/${dir}`;

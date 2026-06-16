@@ -94,13 +94,12 @@ export async function placeTrees(scene, terrainData, treeModels, treeScale, thre
         });
     }
 
-    // Invisible proxy cylinders for missile raycasting
+    // Invisible proxy cylinders used for missile collision raycasting
     const proxyGeo = new THREE.CylinderGeometry(1, 1, 5, 6);
-    const proxyMat = new THREE.MeshBasicMaterial({ visible: false});
+    const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
 
     const treeProxies = placedPositions.map(pos => {
         const proxy = new THREE.Mesh(proxyGeo, proxyMat);
-        // Center the cylinder so its base sits at ground level
         proxy.position.set(pos.x, pos.y + 2.5, pos.z);
         scene.add(proxy);
         return proxy;

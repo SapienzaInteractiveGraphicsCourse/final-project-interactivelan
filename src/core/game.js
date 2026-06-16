@@ -17,7 +17,6 @@ const WAVE_DEFINITIONS = [
     { delay: 1, spawnIndices: [2, 4, 5, 6 ] },
 ];
 
-// Our class to handle, well, the game logic
 export class GameManager {
     constructor(terrain, launcher, tanks, addTank, hud) {
         this.terrain  = terrain;
@@ -84,12 +83,12 @@ export class GameManager {
         this.score++;
         this.hud.updateScore(this.score);
 
-        // Make sure no other tank can cross through the dead tank
+        // Block the dead tank's cell so live tanks path around it
         this.terrain.navMap.setBlocked(
-        tank.group.position.x,
-        tank.group.position.z,
-        2
-    );
+            tank.group.position.x,
+            tank.group.position.z,
+            2
+        );
     }
 
     // Check for win and lose conditions
@@ -102,7 +101,7 @@ export class GameManager {
                 const distanceToLauncher = tank.group.position.distanceTo(this.terrain.launcherSpawn);
                 if (distanceToLauncher < LOSE_DISTANCE) {
                     this.state = GameState.LOSE;
-                    this.hud.showEndScreen('POSITION OVERRUN', 'A tank reached your position.', this.score);
+                    this.hud.showEndScreen('POSITION OVERRUN', 'A tank reached your position.', this.score, false);
                     return;
                 }
             }
@@ -111,7 +110,7 @@ export class GameManager {
         // Win: all waves done and every tank is dead
         if (this.allWavesSpawned && this.allCurrentTanksDead()) {
             this.state = GameState.WIN;
-            this.hud.showEndScreen('AREA SECURED', 'All enemy armor destroyed.', this.score);
+            this.hud.showEndScreen('AREA SECURED', 'All enemy armor destroyed.', this.score, true);
         }
     }
 

@@ -23,7 +23,7 @@ export function spawnExplosion(scene, position, count, lifetime, colors = EXPLOS
         const mesh = new THREE.Mesh(
             new THREE.SphereGeometry(size),
             new THREE.MeshBasicMaterial({
-                color: EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)]
+                color: colors[Math.floor(Math.random() * colors.length)]
             })
         );
 

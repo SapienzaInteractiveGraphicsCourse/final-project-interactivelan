@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Missile } from './missile';
 import { materialLauncher } from '../rendering/materials';
 
-// Let's define some states for our launcher
 export const LauncherState = Object.freeze({
     // Missile is in flight
     FIRED:      'FIRED',
@@ -16,9 +15,8 @@ export const LauncherState = Object.freeze({
     READY:      'READY',
 });
 
-// Our class handling the main part of the game: the Launcher
 export class Launcher {
-    constructor(model, worldObastacles = [], gameAudio = null) {
+    constructor(model, worldObstacles = [], gameAudio = null) {
         this.model = model;
         // Launcher starts as ready to fire
         this.state = LauncherState.READY;
@@ -26,9 +24,9 @@ export class Launcher {
         // Our audio handler
         this.gameAudio = gameAudio;
 
-        this.worldObastacles = worldObastacles;
+        this.worldObstacles = worldObstacles;
 
-        // Start freeloocking with the launcher when clicking on the canvas
+        // Lock pointer on canvas click to enable free-look
         this.onCanvasClick = this.onCanvasClick.bind(this);
 
         // Transform properties
@@ -44,7 +42,6 @@ export class Launcher {
         this.operatorCamPivot = null;
 
         // Rotation speeds and pitch limits
-        // Hardcoded for now, we'll se in the future
         this.YAW_SPEED   = 1.0;
         this.PITCH_SPEED = 0.8;
         this.PITCH_MIN   = -0.5;
@@ -117,9 +114,7 @@ export class Launcher {
         //   \-> Launcher
         //     \-> Missile
         model.traverse((obj) => {
-            // if (obj.isMesh) console.log('Mesh found:', obj.name);
             if (obj.isBone) {
-                // console.log('Bone found:', obj.name);
                 if (obj.name === 'Middle')   this.middleBone   = obj;
                 if (obj.name === 'Launcher') this.launcherBone = obj;
                 if (obj.name === 'Tube')     this.missileBone  = obj;
@@ -143,9 +138,8 @@ export class Launcher {
         this.tubeRestPosition = this.missileBone ? this.missileBone.position.clone() : new THREE.Vector3();
         this.reloadStartPos   = new THREE.Vector3();
 
-        // UI References: we want to load our Overlay from the ATGM camera crosshair
-        this.crosshairElement = null;
-        this.isAiming         = false;
+        this.hud      = null;
+        this.isAiming = false;
 
         // Mouse events for scoped aiming and firing
         this.onMouseMove = this.onMouseMove.bind(this);
@@ -160,40 +154,10 @@ export class Launcher {
         document.addEventListener('contextmenu', this.onContextMenu);
         document.addEventListener('pointerlockchange', this.onPointerLockChange);
         document.addEventListener('click', this.onCanvasClick);
-
-        // Initialize the UI immediately
-        this.initUI();
     }
 
-    // Initialize our UI overlay
-    async initUI() {
-        try {
-            // Load out SVG overlay (sight), in aync modality
-            const response = await fetch(`${import.meta.env.BASE_URL}ui/crosshair.svg`);
-            const svgData  = await response.text();
-
-            // Overlay the loaded SVG to our page
-            this.crosshairElement = document.createElement('div');
-            this.crosshairElement.id = 'crosshair-ui';
-            this.crosshairElement.style.cssText = `
-                position: fixed;
-                top: 0; left: 0;
-                width: 100vw; height: 100vh;
-                pointer-events: none;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                visibility: hidden;
-                z-index: 100;
-            `;
-            this.crosshairElement.innerHTML = svgData;
-            document.body.appendChild(this.crosshairElement);
-
-            if (this.isAiming) this.crosshairElement.style.visibility = 'visible';
-            // Let it be visible if we are in scoped mode
-        } catch (error) {
-            console.error('Failed to load crosshair:', error);
-        }
+    setHUD(hud) {
+        this.hud = hud;
     }
 
     // Move aim with mouse while scoped in
@@ -208,10 +172,9 @@ export class Launcher {
             this.yawOrigin + this.YAW_MAX
         );
 
-    // Pitch controls launcher elevation in both modes
-    this.pitch -= event.movementY * this.MOUSE_SENS_Y;
-    this.pitch  = THREE.MathUtils.clamp(this.pitch, this.PITCH_MIN, this.PITCH_MAX);
-
+        // Pitch controls launcher elevation in both modes
+        this.pitch -= event.movementY * this.MOUSE_SENS_Y;
+        this.pitch  = THREE.MathUtils.clamp(this.pitch, this.PITCH_MIN, this.PITCH_MAX);
     }
 
     // Left click fires, right click toggles scope
@@ -244,9 +207,7 @@ export class Launcher {
         // If pointer lock is lost while scoped in, go back to main camera
         if (!this.isPointerLocked && this.isAiming) {
             this.isAiming = false;
-            if (this.crosshairElement) {
-                this.crosshairElement.style.visibility = 'hidden';
-            }
+            this.hud?.setCrosshairVisible(false);
             if (this.mainCamera) {
                 this.activeCam = this.mainCamera;
             }
@@ -264,9 +225,7 @@ export class Launcher {
     // We set the aiming state and add overlay
     enterAimMode() {
         this.isAiming = true;
-        if (this.crosshairElement) {
-            this.crosshairElement.style.visibility = 'visible';
-        }
+        this.hud?.setCrosshairVisible(true);
 
         // Lock pointer so mouse movement is relative
         document.body.requestPointerLock();
@@ -275,12 +234,9 @@ export class Launcher {
     // We set the aiming state and remove overlay
     exitAimMode() {
         this.isAiming = false;
-        if (this.crosshairElement) {
-            this.crosshairElement.style.visibility = 'hidden';
-        }
+        this.hud?.setCrosshairVisible(false);
 
-        // Keep pointer lock active when leaving scoped view so the player can continue moving the launcher immediately in third-person.
-        // Having to left click again isn't that nice
+        // Keep pointer lock active when leaving scoped view so the player can continue rotating the launcher in third-person
     }
 
     // Switch camera between main and launcher
@@ -300,7 +256,6 @@ export class Launcher {
         }
     }
 
-    // Self explanatory
     setMainCamera(camera) {
         if (camera) {
             this.mainCamera = camera;
@@ -345,7 +300,6 @@ export class Launcher {
 
             const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
 
-            // console.log(box.min.y, groundY);
             if (box.min.y <= groundY) {
                 this.looseTubePhysics.mesh.position.y += groundY - box.min.y;
                 this.looseTubePhysics.velocity.set(0, 0, 0);
@@ -384,7 +338,7 @@ export class Launcher {
         // Update missile if in flight
         if (this.missile && this.missile.alive) {
             const target = this.getSightTarget(scene);
-            const hit    = this.missile.update(delta, target, this.tanks, this.worldObastacles, scene);
+            const hit    = this.missile.update(delta, target, this.tanks, this.worldObstacles, scene);
             if (hit || !this.missile.alive) {
                 this.missile = null;
                 this.state   = LauncherState.POST_FIRE;
@@ -452,12 +406,9 @@ export class Launcher {
         }
         this.wasReloadDown = reloadDown;
 
-        // Refactored this section a bit moving individual updates to separate functions
         this.updateLooseTubePhysics(delta, terrain);
         this.updateReloadAnimation(delta);
         this.updateMissileState(delta, scene);
-
-        
     }
 
     // Add tank to list of our available targets
@@ -660,7 +611,6 @@ export class Launcher {
         // Spawn new missile
         this.missile = new Missile(spawnPos, spawnDir, this.gameAudio);
         this.missile.addToScene(scene);
-
 
         // Transition to FIRED state (locks out reloading until impact)
         this.state = LauncherState.FIRED;

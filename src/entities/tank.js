@@ -4,7 +4,6 @@ import { spawnExplosion, createFire, createSmoke } from '../rendering/effects.js
 import { materialTank } from '../rendering/materials.js';
 
 
-// Let's define some states for our tank
 export const TankState = Object.freeze({
     // Tank is moving and operational
     ALIVE:   'ALIVE',
@@ -109,7 +108,6 @@ export class Tank {
         //    \-> Gun
         model.traverse((obj) => {
             if (obj.isBone) {
-                // console.log('Bone found:', obj.name);
                 if (obj.name === 'Hull')   this.hullBone   = obj;
                 if (obj.name === 'Turret') this.turretBone = obj;
                 if (obj.name === 'Gun')    this.gunBone    = obj;
@@ -326,10 +324,7 @@ export class Tank {
         this.group.position.addScaledVector(facingDirection, moveStep);
         movedThisFrame = moveStep > 0.01;
 
-        // Keep it on the ground after moving
-        if (this.terrain) this.snapToGround(this.terrain);
-
-        // After snapToGround, tilt the tank to match the terrain slope
+        // Snap to ground then tilt the tank to match the terrain slope
         if (this.terrain) {
             this.snapToGround(this.terrain);
 

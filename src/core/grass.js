@@ -1,15 +1,10 @@
 import * as THREE from 'three';
-import { createNoise2D } from 'simplex-noise';
-
 
 export function createGrass(scene, terrain, grassModels, scale = 1.0, density = 0.7) {
-    const densityNoise = createNoise2D();
-    const dummy        = new THREE.Object3D();
+    const dummy = new THREE.Object3D();
 
-    // Walk every terrain vertex 
-    const positions    = terrain.terrain.geometry.attributes.position;
-    const terrainSize  = terrain.size;
-    const densityFactor = THREE.MathUtils.lerp(1.0, 2.0, density);
+    const positions   = terrain.terrain.geometry.attributes.position;
+    const terrainSize = terrain.size;
 
     const transforms = grassModels.map(() => []);
 
@@ -17,8 +12,6 @@ export function createGrass(scene, terrain, grassModels, scale = 1.0, density = 
         const x = positions.getX(i);
         const z = positions.getZ(i);
 
-        const noiseSample = (densityNoise(x * 0.02, z * 0.02) + 1) / 2;
-        //if (Math.random() > noiseSample * densityFactor) continue;
         if (Math.random() > density) continue;
 
         // Small jitter so clumps don't sit exactly on grid points

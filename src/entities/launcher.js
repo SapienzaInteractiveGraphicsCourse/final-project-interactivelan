@@ -141,12 +141,16 @@ export class Launcher {
         this.hud      = null;
         this.isAiming = false;
 
+        this.keys = {};
+
         // Mouse events for scoped aiming and firing
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseDown = this.onMouseDown.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onContextMenu = this.onContextMenu.bind(this);
         this.onPointerLockChange = this.onPointerLockChange.bind(this);
+        this.onKeyDown = this.onKeyDown.bind(this);
+        this.onKeyUp   = this.onKeyUp.bind(this);
 
         document.addEventListener('mousemove', this.onMouseMove);
         document.addEventListener('mousedown', this.onMouseDown);
@@ -154,10 +158,23 @@ export class Launcher {
         document.addEventListener('contextmenu', this.onContextMenu);
         document.addEventListener('pointerlockchange', this.onPointerLockChange);
         document.addEventListener('click', this.onCanvasClick);
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup',   this.onKeyUp);
     }
 
     setHUD(hud) {
         this.hud = hud;
+    }
+
+    onKeyDown(e) {
+        this.keys[e.code] = true;
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+            e.preventDefault();
+        }
+    }
+
+    onKeyUp(e) {
+        this.keys[e.code] = false;
     }
 
     // Move aim with mouse while scoped in
@@ -346,8 +363,7 @@ export class Launcher {
         }
     }
 
-    // Update our launcher's position.
-    update(input, delta, scene, terrain) {
+    update(delta, scene, terrain) {
         this.scene = scene;
 
         // Sync group transform from class properties
@@ -372,8 +388,8 @@ export class Launcher {
 
         // Bone aiming
         if (this.middleBone) {
-            if (input.isDown('ArrowLeft'))  this.yaw += this.YAW_SPEED * delta;
-            if (input.isDown('ArrowRight')) this.yaw -= this.YAW_SPEED * delta;
+            if (this.keys['ArrowLeft'])  this.yaw += this.YAW_SPEED * delta;
+            if (this.keys['ArrowRight']) this.yaw -= this.YAW_SPEED * delta;
 
             this.yaw = THREE.MathUtils.clamp(
                 this.yaw,
@@ -386,8 +402,8 @@ export class Launcher {
 
         if (this.launcherBone) {
             if (!this.isAiming || !this.isPointerLocked) {
-                if (input.isDown('ArrowUp'))   this.pitch = Math.min(this.PITCH_MAX, this.pitch + this.PITCH_SPEED * delta);
-                if (input.isDown('ArrowDown')) this.pitch = Math.max(this.PITCH_MIN, this.pitch - this.PITCH_SPEED * delta);
+                if (this.keys['ArrowUp'])   this.pitch = Math.min(this.PITCH_MAX, this.pitch + this.PITCH_SPEED * delta);
+                if (this.keys['ArrowDown']) this.pitch = Math.max(this.PITCH_MIN, this.pitch - this.PITCH_SPEED * delta);
             }
             this.launcherBone.rotation.x = this.pitch;
         }
@@ -400,7 +416,7 @@ export class Launcher {
         }
 
         // Reload when R is pressed
-        const reloadDown = input.isDown('KeyR');
+        const reloadDown = !!this.keys['KeyR'];
         if (reloadDown && !this.wasReloadDown) {
             this.reload(scene);
         }

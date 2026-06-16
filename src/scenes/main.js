@@ -5,10 +5,9 @@ import { loadModel, loadTreeModels, loadGrassModels } from '../utilities/loader.
 import { Launcher } from '../entities/launcher.js';
 import { Tank, TankState } from '../entities/tank.js';
 
-import { InputHandler } from '../core/input.js';
 import { Terrain } from '../core/terrain.js';
-import { placeTrees } from '../core/clutter.js';
-import { createGrass } from '../core/grass.js';
+import { placeTrees } from '../entities/clutter.js';
+import { createGrass } from '../entities/grass.js';
 
 import { updateExplosions } from '../rendering/effects.js';
 
@@ -75,8 +74,6 @@ scene.add(sun);
 scene.add(hemisphere);
 scene.add(ambient);
 
-const input = new InputHandler();
-
 const gameAudio = new GameAudio(camera);
 await preloadAudio(gameAudio);
 
@@ -106,7 +103,7 @@ const terrain = new Terrain(
 
 const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.55);
 const grassModels    = await loadGrassModels();
-createGrass(scene, terrain, grassModels, 0.5, 2.5);
+createGrass(scene, terrain, grassModels, 0.8, 2.5);
 
 worldObstacles.push(terrain.terrain);
 
@@ -164,7 +161,7 @@ function animate() {
     const delta = (now - lastTime) / 1000;
     lastTime    = now;
 
-    launcher.update(input, delta, scene, terrain.terrain);
+    launcher.update(delta, scene, terrain.terrain);
 
     for (const tank of tanks) {
         const wasDead = tank.state === TankState.DEAD;

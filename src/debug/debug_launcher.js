@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel } from '../utilities/loader.js';
 import { Launcher } from '../entities/launcher.js';
-import { InputHandler } from '../core/input.js';
 import { applyCellShading } from '../rendering/shaders.js';
 import { updateExplosions } from '../rendering/effects.js';
 
@@ -90,8 +89,6 @@ let launcher;
 let tank;
 // Performance monitor
 let lastTime = performance.now();
-// Input handler
-const input  = new InputHandler();
 
 async function init() {
     // Load the ATGM launcher model
@@ -144,7 +141,7 @@ function animate() {
 
     if (launcher) {
         // No terrain in this debug scene
-        launcher.update(input, delta, scene, null);
+        launcher.update(delta, scene, null);
     }
 
     // Only update orbit controls while the free camera is active

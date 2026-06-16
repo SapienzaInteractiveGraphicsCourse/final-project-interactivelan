@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel }     from '../utilities/loader.js';
-import { InputHandler }  from '../core/input.js';
 import { Tank }          from '../entities/tank.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
@@ -109,8 +108,9 @@ let tank;
 
 // Performance monitor
 let lastTime = performance.now();
-// Input handler
-const input  = new InputHandler();
+const keys = {};
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup',   e => keys[e.code] = false);
 
 const hitPosition = new THREE.Vector3(-3, 2, 2.5);
 
@@ -150,17 +150,17 @@ function animate() {
     if (tank) {
         // Arrow keys rotate turret left/right, up/down elevates the gun
         if (tank.turretBone) {
-            if (input.isDown('ArrowLeft'))  tank.turretBone.rotation.y += 1.0 * delta;
-            if (input.isDown('ArrowRight')) tank.turretBone.rotation.y -= 1.0 * delta;
+            if (keys['ArrowLeft'])  tank.turretBone.rotation.y += 1.0 * delta;
+            if (keys['ArrowRight']) tank.turretBone.rotation.y -= 1.0 * delta;
         }
 
         if (tank.gunBone) {
-            if (input.isDown('ArrowUp'))   tank.gunBone.rotation.z = Math.max(-0.1, tank.gunBone.rotation.z - 0.8 * delta);
-            if (input.isDown('ArrowDown')) tank.gunBone.rotation.z = Math.min(0.4,  tank.gunBone.rotation.z + 0.8 * delta);
+            if (keys['ArrowUp'])   tank.gunBone.rotation.z = Math.max(-0.1, tank.gunBone.rotation.z - 0.8 * delta);
+            if (keys['ArrowDown']) tank.gunBone.rotation.z = Math.min(0.4,  tank.gunBone.rotation.z + 0.8 * delta);
         }
 
         // Simulate tank being hit at static position
-        if (input.isDown('KeyH')) tank.hit(hitPosition);
+        if (keys['KeyH']) tank.hit(hitPosition);
 
         tank.update(delta, camera);
     }

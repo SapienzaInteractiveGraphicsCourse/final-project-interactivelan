@@ -6,9 +6,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Use the new Terrain class
 import { Terrain } from '../core/terrain.js';
-import { placeTrees } from '../core/clutter.js';
+import { placeTrees } from '../entities/clutter.js';
 import { loadTreeModels, loadGrassModels } from '../utilities/loader.js';
-import { createGrass } from '../core/grass.js';
+import { createGrass } from '../entities/grass.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(

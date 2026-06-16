@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel } from '../utilities/loader.js';
 import { Launcher } from '../entities/launcher.js';
+import { HUD } from '../ui/hud.js';
 import { applyCellShading } from '../rendering/shaders.js';
 import { updateExplosions } from '../rendering/effects.js';
 
@@ -94,7 +95,9 @@ async function init() {
     // Load the ATGM launcher model
     const launcherModel = await loadModel(`${import.meta.env.BASE_URL}models/launcher.glb`);
     applyCellShading(launcherModel);
+    const hud = new HUD();
     launcher = new Launcher(launcherModel);
+    launcher.setHUD(hud);
     launcher.addToScene(scene, new THREE.Vector3(0, 0, 0));
 
 

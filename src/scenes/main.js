@@ -107,7 +107,10 @@ const grassModels    = await loadGrassModels();
 createGrass(scene, terrain, grassModels, 3, 10);
 
 const rockModels = await loadRockModels();
-const rockProxies = placeRocks(scene, terrain, rockModels, 300, 0.15);
+// Bigger Rocks
+const rockProxies = placeRocks(scene, terrain, rockModels, 200, 0.15);
+// Pebbles
+placeRocks(scene, terrain, rockModels, 300, 0.05, { blockNav: false, collision: false, safeRadius: 0, ignoreProtected: true });
 worldObstacles.push(...rockProxies);
 
 worldObstacles.push(terrain.terrain);
@@ -183,6 +186,8 @@ function animate() {
     const activeCamera = launcher.activeCamera ?? camera;
     gameAudio.setCamera(activeCamera);
     renderer.render(scene, activeCamera);
+
+    if (gameManager.isOver) renderer.setAnimationLoop(null);
 }
 
 renderer.setAnimationLoop(animate);

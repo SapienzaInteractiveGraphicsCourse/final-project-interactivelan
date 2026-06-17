@@ -101,7 +101,7 @@ export class GameManager {
                 const distanceToLauncher = tank.group.position.distanceTo(this.terrain.launcherSpawn);
                 if (distanceToLauncher < LOSE_DISTANCE) {
                     this.state = GameState.LOSE;
-                    this.hud.showEndScreen('POSITION OVERRUN', 'A tank reached your position.', this.score, false);
+                    this.hud.showEndScreen('POSITION OVERRUN', 'Enemy armor breached the defensive perimeter.', this.score, false);
                     return;
                 }
             }
@@ -110,9 +110,11 @@ export class GameManager {
         // Win: all waves done and every tank is dead
         if (this.allWavesSpawned && this.allCurrentTanksDead()) {
             this.state = GameState.WIN;
-            this.hud.showEndScreen('AREA SECURED', 'All enemy armor destroyed.', this.score, true);
+            this.hud.showEndScreen('POSITION HELD', `All ${WAVE_DEFINITIONS.length} waves repelled. No enemy armor remains.`, this.score, true);
         }
     }
+
+    get isOver() { return this.state !== GameState.PLAYING; }
 
     update(delta) {
         if (this.state !== GameState.PLAYING) return;

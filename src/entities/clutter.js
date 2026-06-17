@@ -108,7 +108,7 @@ export async function placeTrees(scene, terrainData, treeModels, treeScale, thre
     return treeProxies;
 }
 
-export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1.0) {
+export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1.0, { blockNav = true, collision = true, safeRadius = 20, ignoreProtected = false } = {}) {
     const navigationMap  = terrainData.navMap;
     const protectedCells = terrainData.protectedCells;
     const launcherSpawn  = terrainData.launcherSpawn;
@@ -116,7 +116,7 @@ export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1
     const sampleStep     = terrainData.cellSize;
     const dummy          = new THREE.Object3D();
 
-    const launcherSafeRadius = 20;
+    const launcherSafeRadius = safeRadius;
     const transforms         = rockModels.map(() => []);
     const placedPositions    = [];
 
@@ -129,7 +129,7 @@ export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1
         const x = (Math.random() - 0.5) * terrainSize;
         const z = (Math.random() - 0.5) * terrainSize;
 
-        if (protectedCells && protectedCells.has(navigationMap.cellKey(x, z))) continue;
+        if (!ignoreProtected && protectedCells && protectedCells.has(navigationMap.cellKey(x, z))) continue;
         if (Math.hypot(x - launcherSpawn.x, z - launcherSpawn.z) < launcherSafeRadius) continue;
 
         const y = terrainData.getHeightAt(x, z);
@@ -156,7 +156,7 @@ export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1
         transforms[modelIndex].push(dummy.matrix.clone());
         placedPositions.push({ x, y, z });
 
-        navigationMap.setBlocked(x, z);
+        if (blockNav) navigationMap.setBlocked(x, z);
     }
 
     for (let rockIndex = 0; rockIndex < rockModels.length; rockIndex++) {
@@ -174,6 +174,8 @@ export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1
             scene.add(inst);
         });
     }
+
+    if (!collision) return [];
 
     // Proxy spheres for missile collision
     const proxyGeo = new THREE.SphereGeometry(1.2, 5, 3);

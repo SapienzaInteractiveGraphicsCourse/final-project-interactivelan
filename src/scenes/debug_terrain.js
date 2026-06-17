@@ -167,6 +167,8 @@ async function init() {
 
     const rockModels = await loadRockModels();
     placeRocks(scene, terrain, rockModels, 500, 0.15);
+    placeRocks(scene, terrain, rockModels, 700, 0.05, { blockNav: false, collision: false, safeRadius: 0, ignoreProtected: true });
+    
 }
 
 init();

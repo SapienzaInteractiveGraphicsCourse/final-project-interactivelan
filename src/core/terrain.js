@@ -207,8 +207,9 @@ export class Terrain {
         this.geometry.setAttribute('color', new THREE.BufferAttribute(colorBuffer, 3));
     }
 
-    // Block off terrain cells that are steeper than a certain amount for navigation
-    blockSteepCells(maxClimb = 4) {
+    // Block off terrain cells that are steeper than a certain slope for navigation.
+    // Uses slope (height / distance) so the threshold stays consistent regardless of cell size.
+    blockSteepCells(maxSlope = 0.96) {
         const verticesPerRow = this.segments + 1;
         const half           = this.size / 2;
 
@@ -217,10 +218,10 @@ export class Terrain {
                 const i = row * verticesPerRow + col;
                 const y = this.heights[i];
 
-                const dRight = Math.abs(this.heights[i + 1]              - y);
-                const dDown  = Math.abs(this.heights[i + verticesPerRow] - y);
+                const slopeRight = Math.abs(this.heights[i + 1]              - y) / this.cellSize;
+                const slopeDown  = Math.abs(this.heights[i + verticesPerRow] - y) / this.cellSize;
 
-                if (dRight > maxClimb || dDown > maxClimb) {
+                if (slopeRight > maxSlope || slopeDown > maxSlope) {
                     const x = -half + col * this.cellSize;
                     const z = -half + row * this.cellSize;
                     this.navMap.setBlocked(x, z);

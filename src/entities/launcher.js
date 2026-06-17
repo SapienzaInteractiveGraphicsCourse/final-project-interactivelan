@@ -141,6 +141,14 @@ export class Launcher {
         this.hud      = null;
         this.isAiming = false;
 
+        this.scopeOverlay = document.createElement('div');
+        this.scopeOverlay.style.cssText = [
+            'position:fixed', 'inset:0', 'pointer-events:none', 'z-index:100',
+            'background:radial-gradient(circle, transparent 30%, rgba(0,0,0,0.97) 45%)',
+            'display:none',
+        ].join(';');
+        document.body.appendChild(this.scopeOverlay);
+
         this.keys = {};
 
         // Mouse events for scoped aiming and firing
@@ -243,6 +251,7 @@ export class Launcher {
     enterAimMode() {
         this.isAiming = true;
         this.hud?.setCrosshairVisible(true);
+        this.scopeOverlay.style.display = 'block';
 
         // Lock pointer so mouse movement is relative
         document.body.requestPointerLock();
@@ -252,6 +261,7 @@ export class Launcher {
     exitAimMode() {
         this.isAiming = false;
         this.hud?.setCrosshairVisible(false);
+        this.scopeOverlay.style.display = 'none';
 
         // Keep pointer lock active when leaving scoped view so the player can continue rotating the launcher in third-person
     }

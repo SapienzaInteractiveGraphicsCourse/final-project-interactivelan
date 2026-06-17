@@ -66,7 +66,7 @@ scene.add(hemisphere);
 scene.add(ambient);
 
 // A grid helps with spatial reference when inspecting a model
-scene.add(new THREE.GridHelper(100, 100));
+scene.add(new THREE.GridHelper(400, 400));
 
 window.scene  = scene;
 window.camera = camera;
@@ -83,57 +83,59 @@ function onResize() {
     if (launcher) launcher.onResize();
 }
 
-// Declare launcher so that it's accessible in animate()
 let launcher;
-// Declare tank so that it's accessible in animate()
-let tank;
-// Performance monitor
-let lastTime = performance.now();
+let tanks     = [];
+let tankModel = null;
+let lastTime  = performance.now();
+
+// Positions and facing for each debug tank
+const TANK_SPAWNS = [
+    new THREE.Vector3(  0, 0,  50),
+    new THREE.Vector3(-30, 0,  90),
+    new THREE.Vector3( 30, 0,  90),
+    new THREE.Vector3(-15, 0, 140),
+    new THREE.Vector3( 15, 0, 140),
+    new THREE.Vector3(  0, 0, 190),
+];
+
+function spawnTanks() {
+    for (const pos of TANK_SPAWNS) {
+        // SkeletonUtils.clone required for skinned meshes, regular clone breaks the skeleton
+        const tank = new Tank(SkeletonUtils.clone(tankModel));
+        tank.addToScene(scene, null, pos);
+        tank.group.rotation.y = Math.PI;
+        launcher.registerTank(tank);
+        tanks.push(tank);
+    }
+}
+
+function despawnTanks() {
+    for (const tank of tanks) {
+        tank.destroy();
+        launcher.removeTank(tank);
+    }
+    tanks = [];
+}
 
 async function init() {
-    // Load the ATGM launcher model
     const launcherModel = await loadModel(`${import.meta.env.BASE_URL}models/launcher.glb`);
     const hud = new HUD();
     launcher = new Launcher(launcherModel);
     launcher.setHUD(hud);
     launcher.addToScene(scene, new THREE.Vector3(0, 0, 0));
 
-
-    // Make rotation limits relative to the debug scene center too,
-    // so camera / aiming behavior matches main.js
+    // Make rotation limits relative to the debug scene center,
+    // so camera and aiming behavior matches main.js
     launcher.setMapCenter(new THREE.Vector3(0, 0, 0));
     launcher.faceToward(new THREE.Vector3(0, 0, -10));
     launcher.setMainCamera();
 
-
-    // We want a tank in front of the launcher, not moving,
-    // just far enough to be a nice clean target for debug
-    const launcherPos = new THREE.Vector3();
-    const launcherDir = new THREE.Vector3();
-
-    launcher.group.getWorldPosition(launcherPos);
-    launcher.group.getWorldDirection(launcherDir);
-
-    // Our launcher model faces the opposite way, same as elsewhere in the project
-    launcherDir.negate();
-
-    const tankPos = new THREE.Vector3(0, 0, 100);
-
-    // SkeletonUtils.clone required for skinned meshes, regular clone breaks the skeleton
-    const tankModel = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
-    tank = new Tank(SkeletonUtils.clone(tankModel));
-
-    // No terrain in this debug scene, tank sits at y=0 and doesn't navigate
-    tank.addToScene(scene, null, tankPos);
-    tank.group.rotation.y = Math.PI;
-
-    // Add tank to list of hittable tanks of our launcher
-    launcher.registerTank(tank);
+    tankModel = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
+    spawnTanks();
 }
 
 
 await init();
-
 
 function animate() {
     const now   = performance.now();
@@ -150,25 +152,29 @@ function animate() {
         controls.update();
     }
 
-    if (tank) {
+    for (const tank of tanks) {
         tank.update(delta, launcher?.activeCamera ?? camera);
     }
 
     updateExplosions(delta);
 
-    // Make sure launcher is defined when animate runs (it gets assigned after init() is ran)
     renderer.render(scene, launcher?.activeCamera ?? camera);
 }
 
 
 createDebugKeys([
-    ['[← →]',    'Rotate launcher'],
-    ['[↑ ↓]',    'Elevate gun'],
-    ['[RMB]',    'Toggle scope'],
-    ['[LMB]',    'Fire  (scoped)'],
-    ['[R]',      'Reload'],
-    ['[Click]',  'Lock pointer'],
+    ['[← →]',   'Rotate launcher'],
+    ['[↑ ↓]',   'Elevate gun'],
+    ['[RMB]',   'Toggle scope'],
+    ['[LMB]',   'Fire  (scoped)'],
+    ['[R]',     'Reload'],
+    ['[G]',     'Respawn tanks'],
+    ['[Click]', 'Lock pointer'],
 ]);
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyG') { despawnTanks(); spawnTanks(); }
+});
 
 // All done, start the scene
 renderer.setAnimationLoop(animate);

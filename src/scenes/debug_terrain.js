@@ -65,6 +65,18 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Terrain generation parameters, read by init() on every regenerate
+let terrainSize      = 500;
+let terrainSegments  = 120;
+let terrainFrequency = 0.005;
+let terrainAmplitude = 25;
+
+// Clutter parameters, read by init() on every regenerate
+let treeThreshold = 0.55;
+let grassDensity  = 50;
+let rockCount     = 500;
+let pebbleCount   = 700;
+
 // Set some variables for our navMap
 let navMapVisible = false;
 let navMapMeshes  = [];
@@ -73,14 +85,33 @@ let terrain;
 const grassModels = await loadGrassModels();
 
 const debugKeys = createDebugKeys([
-    ['[N]',   'Nav map  —  OFF'],
-    ['[LMB]', 'Orbit'],
-    ['[RMB]', 'Pan'],
+    ['[N]',      'Nav map  —  OFF'],
+    ['[G]',      'Regenerate terrain'],
+    ['[LMB]',    'Orbit'],
+    ['[RMB]',    'Pan'],
     ['[Scroll]', 'Zoom'],
 ]);
 
-// If N is pressed, show the generated navMap
-window.addEventListener('keydown', (e) => {
+// Clear everything init() added and run it again
+async function regenerate() {
+    // Hide nav map before wiping the meshes
+    if (navMapVisible) {
+        navMapMeshes.forEach(m => scene.remove(m));
+        navMapMeshes  = [];
+        navMapVisible = false;
+        debugKeys.setLabel('[N]', 'Nav map  —  OFF');
+    }
+
+    // Remove all scene children except the two persistent lights
+    const keep = new Set([light, ambient]);
+    for (let i = scene.children.length - 1; i >= 0; i--) {
+        if (!keep.has(scene.children[i])) scene.remove(scene.children[i]);
+    }
+
+    await init();
+}
+
+window.addEventListener('keydown', async (e) => {
     if (e.code === 'KeyN' && navMap) {
         navMapVisible = !navMapVisible;
         debugKeys.setLabel('[N]', `Nav map  —  ${navMapVisible ? 'ON' : 'OFF'}`);
@@ -93,6 +124,8 @@ window.addEventListener('keydown', (e) => {
             navMapMeshes = [];
         }
     }
+
+    if (e.code === 'KeyG') regenerate();
 });
 
 // We want a blue sky!
@@ -100,17 +133,18 @@ scene.background = new THREE.Color('skyblue');
 
 // Async setup so we can await tree loading
 async function init() {
-    const terrainSize     = 500;
-    const terrainSegments = 120;
-    const frequency       = 0.005;
-    const amplitude       = 25;
-
     // Create terrain class instance
     terrain = new Terrain(
         terrainSize,
         terrainSegments,
-        frequency,
-        amplitude
+        terrainFrequency,
+        terrainAmplitude,
+        new THREE.Vector3(terrainSize * 0.35, 0, terrainSize * 0.35),
+        [
+            new THREE.Vector3(-terrainSize * 0.35, 0,  terrainSize * 0.35),
+            new THREE.Vector3( terrainSize * 0.35, 0, -terrainSize * 0.35),
+            new THREE.Vector3(-terrainSize * 0.35, 0, -terrainSize * 0.35),
+        ]
     );
 
     // Visualize paths from enemy spawns to launcher
@@ -160,16 +194,93 @@ async function init() {
     const treeModels = await loadTreeModels();
 
     // Place trees on terrain
-    await placeTrees(scene, terrain, treeModels, 3, 0.55);
+    await placeTrees(scene, terrain, treeModels, 3, treeThreshold);
 
     // Create grass
-    createGrass(scene, terrain, grassModels, 3, 50);
+    createGrass(scene, terrain, grassModels, 3, grassDensity);
 
     const rockModels = await loadRockModels();
-    placeRocks(scene, terrain, rockModels, 500, 0.15);
-    placeRocks(scene, terrain, rockModels, 700, 0.05, { blockNav: false, collision: false, safeRadius: 0, ignoreProtected: true });
+    placeRocks(scene, terrain, rockModels, rockCount, 0.15);
+    placeRocks(scene, terrain, rockModels, pebbleCount, 0.05, { blockNav: false, collision: false, safeRadius: 0, ignoreProtected: true });
     
 }
+
+// Build the debug UI: two slider boxes stacked in the top-right corner
+(function buildUI() {
+    const container = document.createElement('div');
+    container.style.cssText = [
+        'position:fixed', 'top:16px', 'right:16px',
+        'display:flex', 'flex-direction:column', 'gap:12px',
+        'z-index:9999',
+    ].join(';');
+
+    function makePanel(defs) {
+        const panel = document.createElement('div');
+        panel.style.cssText = [
+            'font-family:monospace', 'font-size:12px', 'color:#ccc',
+            'background:rgba(0,0,0,0.5)', 'padding:10px 14px',
+            'border-radius:4px', 'display:flex', 'flex-direction:column',
+            'gap:8px', 'user-select:none',
+        ].join(';');
+
+        for (const s of defs) {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px';
+
+            const lbl = document.createElement('span');
+            lbl.style.minWidth = '80px';
+            lbl.textContent = s.label;
+
+            const input = document.createElement('input');
+            input.type  = 'range';
+            input.min   = s.min;
+            input.max   = s.max;
+            input.step  = s.step;
+            input.value = s.get();
+            input.style.width = '110px';
+
+            const val = document.createElement('span');
+            val.style.minWidth = '40px';
+            val.textContent = s.fmt(s.get());
+
+            input.addEventListener('input', () => {
+                s.set(parseFloat(input.value));
+                val.textContent = s.fmt(parseFloat(input.value));
+            });
+
+            row.append(lbl, input, val);
+            panel.appendChild(row);
+        }
+
+        return panel;
+    }
+
+    const terrainPanel = makePanel([
+        { label: 'SIZE',      min: 100, max: 800, step: 50, fmt: v => v,        get: () => terrainSize,             set: v => { terrainSize      = v; } },
+        { label: 'SEGMENTS',  min: 40,  max: 200, step: 10, fmt: v => v,        get: () => terrainSegments,         set: v => { terrainSegments  = v; } },
+        { label: 'FREQUENCY', min: 1,   max: 20,  step: 1,  fmt: v => v / 1000, get: () => terrainFrequency * 1000, set: v => { terrainFrequency = v / 1000; } },
+        { label: 'AMPLITUDE', min: 2,   max: 60,  step: 1,  fmt: v => v,        get: () => terrainAmplitude,        set: v => { terrainAmplitude = v; } },
+    ]);
+
+    const clutterPanel = makePanel([
+        { label: 'TREE DENS',  min: 0.3, max: 0.9,  step: 0.05, fmt: v => v.toFixed(2), get: () => treeThreshold, set: v => { treeThreshold = v; } },
+        { label: 'GRASS DENS', min: 10,  max: 200,  step: 10,   fmt: v => v,             get: () => grassDensity,  set: v => { grassDensity  = v; } },
+        { label: 'ROCK COUNT', min: 50,  max: 1000, step: 50,   fmt: v => v,             get: () => rockCount,     set: v => { rockCount     = v; } },
+        { label: 'PEB COUNT',  min: 50,  max: 1500, step: 50,   fmt: v => v,             get: () => pebbleCount,   set: v => { pebbleCount   = v; } },
+    ]);
+
+    const btn = document.createElement('button');
+    btn.textContent = 'REGENERATE';
+    btn.style.cssText = [
+        'padding:6px 0', 'width:100%',
+        'font-family:monospace', 'font-size:12px', 'cursor:pointer',
+        'background:#333', 'color:#ccc', 'border:1px solid #666', 'border-radius:4px',
+    ].join(';');
+    btn.addEventListener('click', () => regenerate());
+
+    container.append(terrainPanel, clutterPanel, btn);
+    document.body.appendChild(container);
+}());
 
 init();
 

@@ -138,7 +138,7 @@ export class TV {
 
             const prompt = this.showStartPrompt();
 
-            // Start on any key or click — browser requires a gesture for audio
+            // Start on any key or click, browser requires a user gesture for audio
             const startOnGesture = async () => {
                 document.removeEventListener('keydown', startOnGesture);
                 document.removeEventListener('click',   startOnGesture);

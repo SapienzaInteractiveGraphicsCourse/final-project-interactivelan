@@ -78,7 +78,7 @@ export class GameManager {
         }
     }
 
-    // A tank just died — add a point and tell the HUD
+    // Called when a tank dies, adds a point and updates the HUD
     onTankDestroyed(tank) {
         this.score++;
         this.hud.updateScore(this.score);

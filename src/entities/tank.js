@@ -218,8 +218,7 @@ export class Tank {
         // Make sure world matrices are current before reading position
         this.group.updateMatrixWorld(true);
 
-        // Snap start to nearest passable cell — the tank may be clipped into a
-        // blocked zone if it spawned near a tree or got wedged in a corner
+        // Snap start to nearest passable cell, the tank may be clipped into a blocked zone if it spawned near a tree or got wedged in a corner
         const safeStart = this.navMap.findNearestPassable(
             this.group.position.x,
             this.group.position.z

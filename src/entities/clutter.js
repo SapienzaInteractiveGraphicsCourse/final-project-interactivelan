@@ -129,7 +129,9 @@ export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1
         const x = (Math.random() - 0.5) * terrainSize;
         const z = (Math.random() - 0.5) * terrainSize;
 
-        if (!ignoreProtected && protectedCells && protectedCells.has(navigationMap.cellKey(x, z))) continue;
+        // Nav-blocking rocks try everywhere, but tryBlock will reject them if they'd cut a path.
+        // Non-blocking decorations still respect corridor restrictions unless ignoreProtected.
+        if (!blockNav && !ignoreProtected && protectedCells && protectedCells.has(navigationMap.cellKey(x, z))) continue;
         if (Math.hypot(x - launcherSpawn.x, z - launcherSpawn.z) < launcherSafeRadius) continue;
 
         const y = terrainData.getHeightAt(x, z);
@@ -153,10 +155,18 @@ export function placeRocks(scene, terrainData, rockModels, count = 80, scale = 1
         dummy.scale.setScalar(rockScale);
         dummy.updateMatrix();
 
+        if (blockNav) {
+            const inCorridor = protectedCells && protectedCells.has(navigationMap.cellKey(x, z));
+            if (inCorridor) {
+                // Only place if the block leaves all spawn-to-launcher paths intact
+                if (!navigationMap.tryBlock(x, z, terrainData.enemySpawnPositions, terrainData.launcherSpawn)) continue;
+            } else {
+                navigationMap.setBlocked(x, z);
+            }
+        }
+
         transforms[modelIndex].push(dummy.matrix.clone());
         placedPositions.push({ x, y, z });
-
-        if (blockNav) navigationMap.setBlocked(x, z);
     }
 
     for (let rockIndex = 0; rockIndex < rockModels.length; rockIndex++) {

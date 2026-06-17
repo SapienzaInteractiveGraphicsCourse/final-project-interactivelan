@@ -117,7 +117,7 @@ const hitPosition = new THREE.Vector3(-3, 2, 2.5);
 
 async function init() {
     // Load the tank model and hand it to the Tank class
-    // SkeletonUtils.clone required for skinned meshes — regular clone breaks the skeleton
+    // SkeletonUtils.clone required for skinned meshes, regular clone breaks the skeleton
     const model = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
     tank = new Tank(SkeletonUtils.clone(model));
     // No terrain in this debug scene, tank sits at y=0

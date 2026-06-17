@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { loadModel } from '../utilities/loader.js';
 
-// A simple static prop —
+// Simple static prop that loads a GLB model and places it in the scene
 export class Prop {
     constructor(model) {
         this.model = model;

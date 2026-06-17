@@ -65,6 +65,79 @@ export class NavigationMap {
         }
     }
 
+    // Try to block a cell without cutting any spawn-to-launcher path.
+    // Keeps the block if all paths survive, rolls it back and returns false otherwise.
+    tryBlock(worldX, worldZ, spawns, goal, bufferRadius = 1) {
+        const [centerColumn, centerRow] = this.worldToGrid(worldX, worldZ);
+        const affected = [];
+
+        for (let dc = -bufferRadius; dc <= bufferRadius; dc++) {
+            for (let dr = -bufferRadius; dr <= bufferRadius; dr++) {
+                const tc = centerColumn + dc;
+                const tr = centerRow    + dr;
+                if (tc >= 0 && tc < this.width && tr >= 0 && tr < this.height) {
+                    affected.push({ tc, tr, wasPassable: this.grid[tc][tr].passable });
+                    this.grid[tc][tr].passable = false;
+                }
+            }
+        }
+
+        if (this._allSpawnsReachable(spawns, goal)) return true;
+
+        for (const { tc, tr, wasPassable } of affected) {
+            this.grid[tc][tr].passable = wasPassable;
+        }
+        return false;
+    }
+
+    // BFS from the goal outward, returns true only if every spawn is reachable.
+    // Pre-allocated Int32Array queue keeps this O(N) with no GC pressure.
+    _allSpawnsReachable(spawns, goal) {
+        const [goalCol, goalRow] = this.worldToGrid(goal.x, goal.z);
+        if (!this.grid[goalCol]?.[goalRow]?.passable) return false;
+
+        const encode  = (c, r) => c * this.height + r;
+        const visited = new Uint8Array(this.width * this.height);
+        const queue   = new Int32Array(this.width * this.height);
+        let head = 0, tail = 0;
+
+        visited[encode(goalCol, goalRow)] = 1;
+        queue[tail++] = encode(goalCol, goalRow);
+
+        const spawnSet = new Set(spawns.map(s => {
+            const [c, r] = this.worldToGrid(s.x, s.z);
+            return encode(c, r);
+        }));
+        let reached = 0;
+
+        while (head < tail) {
+            const idx = queue[head++];
+            const c   = Math.floor(idx / this.height);
+            const r   = idx % this.height;
+
+            if (spawnSet.has(idx) && ++reached === spawnSet.size) return true;
+
+            for (let dc = -1; dc <= 1; dc++) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    if (dc === 0 && dr === 0) continue;
+                    const nc = c + dc;
+                    const nr = r + dr;
+                    if (nc < 0 || nc >= this.width || nr < 0 || nr >= this.height) continue;
+                    if (!this.grid[nc][nr].passable) continue;
+                    // Match the diagonal corner-cutting rule used in findPath
+                    if (dc !== 0 && dr !== 0 &&
+                        (!this.grid[nc][r].passable || !this.grid[c][nr].passable)) continue;
+                    const nidx = encode(nc, nr);
+                    if (visited[nidx]) continue;
+                    visited[nidx] = 1;
+                    queue[tail++] = nidx;
+                }
+            }
+        }
+
+        return reached === spawnSet.size;
+    }
+
     // Query our map to check if a specific cell is navigable
     isPassable(worldX, worldZ) {
         const [gridColumn, gridRow] = this.worldToGrid(worldX, worldZ);
@@ -74,11 +147,10 @@ export class NavigationMap {
 
     // Find the nearest passable cell to a world position
     // Used before pathfinding so we never start from inside a blocked cell
-    // (e.g. a tank that clipped into a tree's blocked zone)
     findNearestPassable(worldX, worldZ, searchRadius = 10) {
         const [startColumn, startRow] = this.worldToGrid(worldX, worldZ);
 
-        // Already passable — return the original position as-is
+        // Already passable, return the original position as-is
         if (this.grid[startColumn]?.[startRow]?.passable) return { x: worldX, z: worldZ };
 
         // Spiral outward ring by ring until we find a passable cell
@@ -135,7 +207,7 @@ export class NavigationMap {
         return meshes;
     }
 
-    // Visualize a path on the scene — debug only
+    // Visualize a path on the scene, debug only
     visualizePath(scene, path, terrain = null) {
         if (!path || path.length === 0) return;
 
@@ -196,7 +268,7 @@ export class NavigationMap {
         // Convert grid coordinates to a unique string key for use in Maps and Sets
         const makeKey = (column, row) => `${column},${row}`;
 
-        // Euclidean distance to goal — straight-line heuristic
+        // Euclidean straight-line distance to goal as the heuristic
         const estimateCostToGoal = (column, row) => Math.hypot(column - goalColumn, row - goalRow);
 
         // Initialize with start node
@@ -215,7 +287,7 @@ export class NavigationMap {
             const current    = openSet.shift();
             const currentKey = makeKey(current.column, current.row);
 
-            // Reached the goal — reconstruct path by walking back through cameFrom
+            // Reached the goal, reconstruct path by walking back through cameFrom
             if (current.column === goalColumn && current.row === goalRow) {
                 const path = [];
                 let nodeKey = currentKey;

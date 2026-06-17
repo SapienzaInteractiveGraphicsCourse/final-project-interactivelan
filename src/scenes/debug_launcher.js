@@ -121,7 +121,7 @@ async function init() {
 
     const tankPos = new THREE.Vector3(0, 0, 100);
 
-    // SkeletonUtils.clone required for skinned meshes — regular clone breaks the skeleton
+    // SkeletonUtils.clone required for skinned meshes, regular clone breaks the skeleton
     const tankModel = await loadModel(`${import.meta.env.BASE_URL}models/tank.glb`);
     tank = new Tank(SkeletonUtils.clone(tankModel));
 

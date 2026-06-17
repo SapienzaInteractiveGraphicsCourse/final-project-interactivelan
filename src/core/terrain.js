@@ -8,7 +8,7 @@ function smoothstep(e0, e1, x) {
     return t * t * (3 - 2 * t);
 }
 
-// Minimum height we want the launcher to sit at — regenerate if we don't get it
+// Minimum height required for the launcher position, terrain is regenerated if not met
 const MIN_LAUNCHER_HEIGHT = 3.0;
 const MAX_GENERATION_ATTEMPTS = 10;
 
@@ -166,7 +166,7 @@ export class Terrain {
             const y = this.geometry.attributes.position.getY(i);
             const z = this.geometry.attributes.position.getZ(i);
 
-            // Slope from neighboring heights — rock goes where it's steep, not where it's tall
+            // Slope from neighboring heights, rock color applies to steep areas not tall ones
             const row  = Math.floor(i / verticesPerRow);
             const col  = i % verticesPerRow;
             const iL   = row * verticesPerRow + Math.max(col - 1, 0);

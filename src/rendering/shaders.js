@@ -26,7 +26,7 @@ export function createToonGradientMap() {
     return gradientMap;
 }
 
-// Apply cell shading to any object — keeps original colors
+// Apply cell shading to any object, keeps its original colors
 export function applyCellShading(object) {
     object.traverse((child) => {
         if (!child.isMesh || child.userData.isOutline) return;
@@ -44,10 +44,10 @@ export function applyCellShading(object) {
     });
 }
 
-// Apply cell shading to trees — adds random hue and light variation per tree
+// Apply cell shading to trees with random hue and brightness variation per tree
 // for a more natural forest look
 export function applyTreeCellShading(object) {
-    // Randomize once per tree, not per mesh — so trunk and canopy stay consistent
+    // Randomize once per tree not per mesh, so trunk and canopy stay consistent
     const hueVariation   = (Math.random() - 0.5) * 0.05;
     const lightVariation = (Math.random() - 0.5) * 0.2;
 

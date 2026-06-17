@@ -105,11 +105,11 @@ export class NavigationMap {
             }
         }
 
-        // Nothing found within the search radius — return original as fallback
+        // Nothing found within the search radius
         return { x: worldX, z: worldZ };
     }
 
-    // Visualize our current navigation map — debug only
+    // Visualize our current navigation map
     visualize(scene) {
         const geometry = new THREE.PlaneGeometry(this.cellSize, this.cellSize);
         geometry.rotateX(-Math.PI / 2);
@@ -126,7 +126,7 @@ export class NavigationMap {
                 const [wx, wz] = this.gridToWorld(gridColumn, gridRow);
 
                 // Position slightly above terrain so the overlay is readable
-                mesh.position.set(wx, cell.height + 15, wz);
+                mesh.position.set(wx, cell.height + 20, wz);
                 meshes.push(mesh);
                 scene.add(mesh);
             }

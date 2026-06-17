@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { applyCellShading } from '../rendering/shaders.js';
 import { spawnExplosion, createFire, createSmoke } from '../rendering/effects.js';
 import { materialTank } from '../rendering/materials.js';
 

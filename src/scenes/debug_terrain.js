@@ -6,8 +6,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Use the new Terrain class
 import { Terrain } from '../core/terrain.js';
-import { placeTrees } from '../entities/clutter.js';
-import { loadTreeModels, loadGrassModels } from '../utilities/loader.js';
+import { placeTrees, placeRocks } from '../entities/clutter.js';
+import { loadTreeModels, loadGrassModels, loadRockModels } from '../utilities/loader.js';
 import { createGrass } from '../entities/grass.js';
 import { createDebugKeys } from '../ui/hud.js';
 
@@ -162,8 +162,11 @@ async function init() {
     // Place trees on terrain
     await placeTrees(scene, terrain, treeModels, 3, 0.55);
 
-    // Create grass 
-    createGrass(scene, terrain, grassModels, 0.75, 0.7);
+    // Create grass
+    createGrass(scene, terrain, grassModels, 3, 50);
+
+    const rockModels = await loadRockModels();
+    placeRocks(scene, terrain, rockModels, 500, 0.15);
 }
 
 init();

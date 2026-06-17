@@ -26,8 +26,8 @@ export async function runIntro(renderer, camera, init) {
     const hemiLight = new THREE.HemisphereLight(0xbfd8ff, 0x1a1a1a, 0.55);
     introScene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfff3e0, 2.3);
-    keyLight.position.set(1, 2, 3);
+    const keyLight = new THREE.DirectionalLight(0xfff3e0, 0.09);
+    keyLight.position.set(1, 3, 10);
     introScene.add(keyLight);
 
     // Run the intro render loop while the TV plays

@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 
-import { loadModel, loadTreeModels, loadGrassModels } from '../utilities/loader.js';
+import { loadModel, loadTreeModels, loadGrassModels, loadRockModels } from '../utilities/loader.js';
 
 import { Launcher } from '../entities/launcher.js';
 import { Tank, TankState } from '../entities/tank.js';
 
 import { Terrain } from '../core/terrain.js';
-import { placeTrees } from '../entities/clutter.js';
+import { placeTrees, placeRocks } from '../entities/clutter.js';
 import { createGrass } from '../entities/grass.js';
 
 import { updateExplosions } from '../rendering/effects.js';
@@ -26,7 +26,8 @@ const scene = new THREE.Scene();
 const skyTexture      = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/sky.jpeg`);
 skyTexture.mapping    = THREE.EquirectangularReflectionMapping;
 skyTexture.colorSpace = THREE.SRGBColorSpace;
-scene.background      = skyTexture;
+scene.background         = skyTexture;
+scene.backgroundRotation = new THREE.Euler(-0.15, 0, 0);
 
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -86,7 +87,7 @@ const terrain = new Terrain(
     100,
     0.005,
     8,
-    new THREE.Vector3(140, 0, 140),
+    new THREE.Vector3(100, 0, 100),
     [
         new THREE.Vector3(-140, 0, -90),
         new THREE.Vector3(-135, 0, -70),
@@ -103,7 +104,11 @@ const terrain = new Terrain(
 
 const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.55);
 const grassModels    = await loadGrassModels();
-createGrass(scene, terrain, grassModels, 0.8, 2.5);
+createGrass(scene, terrain, grassModels, 3, 10);
+
+const rockModels = await loadRockModels();
+const rockProxies = placeRocks(scene, terrain, rockModels, 300, 0.15);
+worldObstacles.push(...rockProxies);
 
 worldObstacles.push(terrain.terrain);
 

@@ -9,12 +9,11 @@ import { createDebugKeys } from '../ui/hud.js';
 
 // Class to help debug tank hitboxes and such
 class TankDebugger {
-    constructor(tank, scene, camera, renderer, input) {
+    constructor(tank, scene, camera, renderer) {
         this.tank     = tank;
         this.scene    = scene;
         this.camera   = camera;
         this.renderer = renderer;
-        this.input    = input;
 
         this._setupHitTest();
     }
@@ -125,7 +124,7 @@ async function init() {
     tank.addToScene(scene, null, new THREE.Vector3(0, 0, 0));
 
     // Start debugger
-    const tankDebugger = new TankDebugger(tank, scene, camera, renderer, input);
+    const tankDebugger = new TankDebugger(tank, scene, camera, renderer);
 
     // Autoposition camera according to model's bounds, so it's always framed correctly
     const box    = new THREE.Box3().setFromObject(tank.group);
@@ -156,8 +155,8 @@ function animate() {
         }
 
         if (tank.gunBone) {
-            if (keys['ArrowUp'])   tank.gunBone.rotation.z = Math.max(-0.1, tank.gunBone.rotation.z - 0.8 * delta);
-            if (keys['ArrowDown']) tank.gunBone.rotation.z = Math.min(0.4,  tank.gunBone.rotation.z + 0.8 * delta);
+            if (keys['ArrowUp'])   tank.gunBone.rotation.z = Math.max(-0.2, tank.gunBone.rotation.z - 0.8 * delta);
+            if (keys['ArrowDown']) tank.gunBone.rotation.z = Math.min(0.1,  tank.gunBone.rotation.z + 0.8 * delta);
         }
 
         // Simulate tank being hit at static position

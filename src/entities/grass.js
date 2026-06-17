@@ -1,51 +1,66 @@
 import * as THREE from 'three';
 
-export function createGrass(scene, terrain, grassModels, scale = 1.0, density = 0.7) {
-    const dummy = new THREE.Object3D();
+const GRASS_COLOR = new THREE.Color(0x00A728);
 
-    const positions   = terrain.terrain.geometry.attributes.position;
+export function createGrass(scene, terrain, grassModels, scale = 1.0, density = 1.0) {
+    const dummy       = new THREE.Object3D();
     const terrainSize = terrain.size;
+    const half        = terrainSize / 2;
+    const transforms  = grassModels.map(() => []);
 
-    const transforms = grassModels.map(() => []);
+    const numClusters         = Math.round(60 * density);
+    const instancesPerCluster = 20;
+    const clusterRadius       = terrainSize * 0.04;
 
-    for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i);
-        const z = positions.getZ(i);
+    for (let c = 0; c < numClusters; c++) {
+        const cx = (Math.random() - 0.5) * terrainSize;
+        const cz = (Math.random() - 0.5) * terrainSize;
 
-        if (Math.random() > density) continue;
+        for (let i = 0; i < instancesPerCluster; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r     = Math.sqrt(Math.random()) * clusterRadius;
 
-        // Small jitter so clumps don't sit exactly on grid points
-        const jitterX = (Math.random() - 0.5) * 4;
-        const jitterZ = (Math.random() - 0.5) * 4;
-        const px      = THREE.MathUtils.clamp(x + jitterX, -terrainSize / 2, terrainSize / 2);
-        const pz      = THREE.MathUtils.clamp(z + jitterZ, -terrainSize / 2, terrainSize / 2);
-        const py      = terrain.getHeightAt(px, pz);
+            const px = THREE.MathUtils.clamp(cx + Math.cos(angle) * r, -half, half);
+            const pz = THREE.MathUtils.clamp(cz + Math.sin(angle) * r, -half, half);
 
-        dummy.scale.setScalar(scale * THREE.MathUtils.randFloat(0.8, 1.3));
-        dummy.position.set(px, py, pz);
-        // Correct model rotation
-        dummy.rotation.set(-Math.PI / 2, 0, 0);
-        dummy.updateMatrix();
+            const step  = terrainSize / 120;
+            const dhdx  = terrain.getHeightAt(px + step, pz) - terrain.getHeightAt(px - step, pz);
+            const dhdz  = terrain.getHeightAt(px, pz + step) - terrain.getHeightAt(px, pz - step);
+            const slope = Math.sqrt(dhdx * dhdx + dhdz * dhdz) / (2 * step);
+            if (slope > 0.45) continue;
 
-        transforms[Math.floor(Math.random() * grassModels.length)].push(dummy.matrix.clone());
+            const py = terrain.getHeightAt(px, pz);
+
+            // Skip bare dirt at low elevations, slope check above handles steep faces
+            const h = THREE.MathUtils.clamp((py + terrain.amplitude) / (2 * terrain.amplitude), 0, 1);
+            if (h < 0.35) continue;
+
+            dummy.position.set(px, py, pz);
+            dummy.rotation.y = Math.random() * Math.PI * 2;
+            dummy.scale.setScalar(scale * THREE.MathUtils.randFloat(0.75, 1.4));
+            dummy.updateMatrix();
+
+            transforms[Math.floor(Math.random() * grassModels.length)].push(dummy.matrix.clone());
+        }
     }
 
-    // One InstancedMesh per mesh inside each GLB — same approach as trees
     const instances = [];
 
-    for (let variantIndex = 0; variantIndex < grassModels.length; variantIndex++) {
-        if (transforms[variantIndex].length === 0) continue;
+    for (let vi = 0; vi < grassModels.length; vi++) {
+        if (transforms[vi].length === 0) continue;
 
-        grassModels[variantIndex].traverse(obj => {
+        grassModels[vi].traverse(obj => {
             if (!obj.isMesh) return;
 
-            const inst = new THREE.InstancedMesh(
-                obj.geometry,
-                obj.material,
-                transforms[variantIndex].length
-            );
+            const mat = obj.material.clone();
+            mat.color.copy(GRASS_COLOR);
+            if ('emissive' in mat) {
+                mat.emissive.setHex(0x0d4a18);
+                mat.emissiveIntensity = 0.2;
+            }
 
-            transforms[variantIndex].forEach((matrix, i) => inst.setMatrixAt(i, matrix));
+            const inst = new THREE.InstancedMesh(obj.geometry, mat, transforms[vi].length);
+            transforms[vi].forEach((matrix, i) => inst.setMatrixAt(i, matrix));
 
             inst.castShadow    = true;
             inst.receiveShadow = true;
@@ -61,6 +76,7 @@ export function createGrass(scene, terrain, grassModels, scale = 1.0, density = 
             for (const inst of instances) {
                 scene.remove(inst);
                 inst.geometry.dispose();
+                inst.material.dispose();
             }
         }
     };

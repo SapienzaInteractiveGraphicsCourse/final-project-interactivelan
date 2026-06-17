@@ -3,6 +3,11 @@ import { createNoise2D } from 'simplex-noise';
 import { NavigationMap } from './navigation.js';
 import { materialTerrain } from '../rendering/materials';
 
+function smoothstep(e0, e1, x) {
+    const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+}
+
 // Minimum height we want the launcher to sit at — regenerate if we don't get it
 const MIN_LAUNCHER_HEIGHT = 3.0;
 const MAX_GENERATION_ATTEMPTS = 10;
@@ -48,9 +53,9 @@ export class Terrain {
 
         // Some gameplay values for our launcher placement
         this.MIN_LAUNCHER_ENEMY_DISTANCE = 150;
-        this.LAUNCHER_SEARCH_RADIUS      = 70;
+        this.LAUNCHER_SEARCH_RADIUS      = 50;
         this.LAUNCHER_CANDIDATE_COUNT    = 120;
-        this.LAUNCHER_EDGE_MARGIN        = 20;
+        this.LAUNCHER_EDGE_MARGIN        = 40;
 
         // Create the plane itself, rotate it so it's flat on the ground
         this.geometry = new THREE.PlaneGeometry(size, size, segments, segments);
@@ -148,35 +153,51 @@ export class Terrain {
 
     // Vertex color variation to make our world look more alive
     _applyVertexColors() {
-        const colorBuffer = new Float32Array(this.vertCount * 3);
-        const colorNoise  = createNoise2D();
+        const colorBuffer    = new Float32Array(this.vertCount * 3);
+        const colorNoise     = createNoise2D();
+        const verticesPerRow = this.segments + 1;
+
+        const DIRT  = [0.52, 0.34, 0.16];
+        const GRASS = [0.18, 0.68, 0.14];
+        const ROCK  = [0.54, 0.50, 0.40];
 
         for (let i = 0; i < this.vertCount; i++) {
             const x = this.geometry.attributes.position.getX(i);
             const y = this.geometry.attributes.position.getY(i);
             const z = this.geometry.attributes.position.getZ(i);
 
+            // Slope from neighboring heights — rock goes where it's steep, not where it's tall
+            const row  = Math.floor(i / verticesPerRow);
+            const col  = i % verticesPerRow;
+            const iL   = row * verticesPerRow + Math.max(col - 1, 0);
+            const iR   = row * verticesPerRow + Math.min(col + 1, this.segments);
+            const iU   = Math.max(row - 1, 0) * verticesPerRow + col;
+            const iD   = Math.min(row + 1, this.segments) * verticesPerRow + col;
+            const dhdx = (this.heights[iR] - this.heights[iL]) / (2 * this.cellSize);
+            const dhdz = (this.heights[iD] - this.heights[iU]) / (2 * this.cellSize);
+            const slope = Math.sqrt(dhdx * dhdx + dhdz * dhdz);
+
             const n = (colorNoise(x * 0.02, z * 0.02) + 1) * 0.5;
             const h = THREE.MathUtils.clamp((y + this.amplitude) / (2 * this.amplitude), 0, 1);
 
-            let r, g, b;
+            // Low ground is dirt, everything above is grass
+            const t1    = smoothstep(0.22, 0.50, h);
+            // Steep slopes become rocky regardless of elevation
+            const tRock = smoothstep(0.40, 0.90, slope);
 
-            if (h < 0.35) {
-                // Low ground: dirt
-                r = 0.45 + n * 0.08;
-                g = 0.36 + n * 0.06;
-                b = 0.24 + n * 0.05;
-            } else if (h < 0.7) {
-                // Mid ground: grass
-                r = 0.32 + n * 0.06;
-                g = 0.50 + n * 0.10;
-                b = 0.22 + n * 0.05;
-            } else {
-                // High ground: dry rock
-                r = 0.5  + n * 0.06;
-                g = 0.48 + n * 0.06;
-                b = 0.42 + n * 0.05;
-            }
+            let r = DIRT[0] + (GRASS[0] - DIRT[0]) * t1;
+            let g = DIRT[1] + (GRASS[1] - DIRT[1]) * t1;
+            let b = DIRT[2] + (GRASS[2] - DIRT[2]) * t1;
+
+            r = r + (ROCK[0] - r) * tRock;
+            g = g + (ROCK[1] - g) * tRock;
+            b = b + (ROCK[2] - b) * tRock;
+
+            // noise goes both ways so some verts get darker too
+            const nv = (n - 0.5);
+            r = THREE.MathUtils.clamp(r + nv * 0.08, 0, 1);
+            g = THREE.MathUtils.clamp(g + nv * 0.10, 0, 1);
+            b = THREE.MathUtils.clamp(b + nv * 0.06, 0, 1);
 
             colorBuffer[i * 3]     = r;
             colorBuffer[i * 3 + 1] = g;

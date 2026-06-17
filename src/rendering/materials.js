@@ -42,27 +42,22 @@ function makePBR(dir, metalnessOverride = -1, roughnessOverride = -1) {
 export const materialLauncher = makePBR('launcher');
 export const materialTank = makePBR('tank');
 
-// Our Material Terrain is slightly more complicated
-export const materialTerrain = makePBR('terrain');
+// Terrain: force matte roughness so it doesn't look plastic, zero metalness
+export const materialTerrain = makePBR('terrain', 0, 0.92);
 
 // Set our tiling for terrain
-materialTerrain.map.repeat.set(100, 100);
+materialTerrain.map.repeat.set(50, 50);
 materialTerrain.map.wrapS = THREE.RepeatWrapping;
 materialTerrain.map.wrapT = THREE.RepeatWrapping;
 
 // Same for other maps
-materialTerrain.normalMap.repeat.set(100, 100);
+materialTerrain.normalMap.repeat.set(50, 50);
 materialTerrain.normalMap.wrapS = THREE.RepeatWrapping;
 materialTerrain.normalMap.wrapT = THREE.RepeatWrapping;
 
-materialTerrain.roughnessMap.repeat.set(100, 100);
-materialTerrain.roughnessMap.wrapS = THREE.RepeatWrapping;
-materialTerrain.roughnessMap.wrapT = THREE.RepeatWrapping;
-
-materialTerrain.aoMap.repeat.set(100, 100);
+materialTerrain.aoMap.repeat.set(50, 50);
 materialTerrain.aoMap.wrapS = THREE.RepeatWrapping;
 materialTerrain.aoMap.wrapT = THREE.RepeatWrapping;
 
-// Make the terrain normals stronger so light shows more surface detail
-materialTerrain.normalScale = new THREE.Vector2(2.0, 2.0);
-materialTerrain.vertexColors = true; 
+materialTerrain.normalScale = new THREE.Vector2(1.4, 1.4);
+materialTerrain.vertexColors = true;

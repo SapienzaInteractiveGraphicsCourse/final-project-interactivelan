@@ -28,7 +28,15 @@ export async function loadGrassModels() {
         loadModel(`${import.meta.env.BASE_URL}models/grass_a.glb`),
         loadModel(`${import.meta.env.BASE_URL}models/grass_b.glb`),
         loadModel(`${import.meta.env.BASE_URL}models/grass_c.glb`),
-        loadModel(`${import.meta.env.BASE_URL}models/grass_d.glb`)
-        //loadModel(`${import.meta.env.BASE_URL}models/grass_e.glb`)
+        loadModel(`${import.meta.env.BASE_URL}models/grass_d.glb`),
+        loadModel(`${import.meta.env.BASE_URL}models/grass_e.glb`)
+    ]);
+}
+
+export async function loadRockModels() {
+    return Promise.all([
+        loadModel(`${import.meta.env.BASE_URL}models/rock_a.glb`),
+        loadModel(`${import.meta.env.BASE_URL}models/rock_b.glb`),
+        loadModel(`${import.meta.env.BASE_URL}models/rock_c.glb`),
     ]);
 }

@@ -44,14 +44,18 @@ export class TV {
 
             materials.forEach((mat, index) => {
                 if (mat.name === 'Screen') {
-                    const screenMat = new THREE.MeshBasicMaterial({
-                        map: this.videoTexture,
-                        // MeshBasicMaterial is needed so that our screen can EMIT light instead of RECEIVING it
+                    // Emissive with shininess
+                    const screenMat = new THREE.MeshPhongMaterial({
+                        map:               this.videoTexture,
+                        emissiveMap:       this.videoTexture,
+                        emissive:          new THREE.Color(1, 1, 1),
+                        emissiveIntensity: 0.88,
+                        shininess:         20,
+                        specular:          new THREE.Color(0.28, 0.32, 0.38),
                     });
 
-                        obj.material = screenMat;
-                        this.screenMesh = obj;
-                    
+                    obj.material    = screenMat;
+                    this.screenMesh = obj;
                 }
             });
         });

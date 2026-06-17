@@ -141,9 +141,23 @@ export class Launcher {
         this.hud      = null;
         this.isAiming = false;
 
+        // Low-res canvas scaled to viewport, gives digital/CCTV noise when updated each frame
+        const NW = 320, NH = 180;
+        this.noiseCanvas = document.createElement('canvas');
+        this.noiseCanvas.width  = NW;
+        this.noiseCanvas.height = NH;
+        this.noiseCanvas.style.cssText = [
+            'position:fixed', 'inset:0', 'width:100%', 'height:100%',
+            'pointer-events:none', 'z-index:100',
+            'mix-blend-mode:screen', 'image-rendering:pixelated', 'display:none',
+        ].join(';');
+        document.body.appendChild(this.noiseCanvas);
+        this.noiseCtx       = this.noiseCanvas.getContext('2d');
+        this.noiseImageData = this.noiseCtx.createImageData(NW, NH);
+
         this.scopeOverlay = document.createElement('div');
         this.scopeOverlay.style.cssText = [
-            'position:fixed', 'inset:0', 'pointer-events:none', 'z-index:100',
+            'position:fixed', 'inset:0', 'pointer-events:none', 'z-index:101',
             'background:radial-gradient(circle, transparent 30%, rgba(0,0,0,0.97) 45%)',
             'display:none',
         ].join(';');
@@ -251,7 +265,8 @@ export class Launcher {
     enterAimMode() {
         this.isAiming = true;
         this.hud?.setCrosshairVisible(true);
-        this.scopeOverlay.style.display = 'block';
+        this.scopeOverlay.style.display  = 'block';
+        this.noiseCanvas.style.display   = 'block';
 
         // Lock pointer so mouse movement is relative
         document.body.requestPointerLock();
@@ -262,6 +277,7 @@ export class Launcher {
         this.isAiming = false;
         this.hud?.setCrosshairVisible(false);
         this.scopeOverlay.style.display = 'none';
+        this.noiseCanvas.style.display  = 'none';
 
         // Keep pointer lock active when leaving scoped view so the player can continue rotating the launcher in third-person
     }
@@ -327,6 +343,14 @@ export class Launcher {
 
             const box = new THREE.Box3().setFromObject(this.looseTubePhysics.mesh);
 
+            // Start the drop sound a little before impact so it peaks on landing
+            if (!this.tubeDropTriggered && this.tubeDropSound && box.min.y <= groundY + 1.5) {
+                this.tubeDropTriggered = true;
+                this.tubeDropSound.position.copy(tubePos);
+                if (this.tubeDropSound.isPlaying) this.tubeDropSound.stop();
+                this.tubeDropSound.play();
+            }
+
             if (box.min.y <= groundY) {
                 this.looseTubePhysics.mesh.position.y += groundY - box.min.y;
                 this.looseTubePhysics.velocity.set(0, 0, 0);
@@ -357,6 +381,10 @@ export class Launcher {
             if (t >= 1) {
                 this.reloadTimer = 0;
                 this.state       = LauncherState.READY;
+                if (this.reloadClickSound) {
+                    if (this.reloadClickSound.isPlaying) this.reloadClickSound.stop();
+                    this.reloadClickSound.play();
+                }
             }
         }
     }
@@ -435,6 +463,8 @@ export class Launcher {
         this.updateLooseTubePhysics(delta, terrain);
         this.updateReloadAnimation(delta);
         this.updateMissileState(delta, scene);
+
+        if (this.isAiming) this._updateNoise();
     }
 
     // Add tank to list of our available targets
@@ -514,8 +544,24 @@ export class Launcher {
                     rolloffFactor: 1.3,
                     maxDistance: 80,
                 });
-
                 this.group.add(this.tubeTossSound);
+
+                // Drop sound plays when the tube hits the ground, positioned at the landing spot
+                this.tubeDropSound = this.gameAudio.createPositional('tubeDrop', {
+                    volume: 0.9,
+                    refDistance: 10,
+                    rolloffFactor: 1.5,
+                    maxDistance: 60,
+                });
+                scene.add(this.tubeDropSound);
+
+                this.reloadClickSound = this.gameAudio.createPositional('reloadClick', {
+                    volume: 1.0,
+                    refDistance: 8,
+                    rolloffFactor: 1.2,
+                    maxDistance: 40,
+                });
+                this.group.add(this.reloadClickSound);
             }
         }
 
@@ -642,6 +688,19 @@ export class Launcher {
         this.state = LauncherState.FIRED;
     }
 
+    _updateNoise() {
+        const d = this.noiseImageData.data;
+        for (let i = 0; i < d.length; i += 4) {
+            // Subtle base grain with rare hot pixels
+            const v = Math.random() < 0.015
+                ? (Math.random() * 120 + 60) | 0
+                : (Math.random() * 14)        | 0;
+            d[i] = d[i + 1] = d[i + 2] = v;
+            d[i + 3] = 255;
+        }
+        this.noiseCtx.putImageData(this.noiseImageData, 0, 0);
+    }
+
     reload(scene) {
         // Only allow reload AFTER the missile is destroyed/lost
         if (this.state !== LauncherState.POST_FIRE) return;
@@ -654,6 +713,7 @@ export class Launcher {
         }
 
         // Enter tossing state and trigger the toss
+        this.tubeDropTriggered = false;
         this.state = LauncherState.TOSSING;
         this.looseTubePhysics = this.tossTube(scene);
     }

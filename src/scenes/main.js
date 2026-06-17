@@ -104,7 +104,7 @@ const terrain = new Terrain(
 
 const worldObstacles = await placeTrees(scene, terrain, treeModels, 3, 0.55);
 const grassModels    = await loadGrassModels();
-createGrass(scene, terrain, grassModels, 3, 20);
+createGrass(scene, terrain, grassModels, 3, 10);
 
 const rockModels = await loadRockModels();
 // Bigger Rocks

@@ -67,6 +67,8 @@ export async function preloadAudio(gameAudio) {
         ['launcherFire', `${import.meta.env.BASE_URL}sounds/missile_firing.ogg`],
         ['launcherReload', `${import.meta.env.BASE_URL}sounds/reload.ogg`],
         ['tubeToss', `${import.meta.env.BASE_URL}sounds/reload.ogg`],
+        ['tubeDrop',     `${import.meta.env.BASE_URL}sounds/drop.ogg`],
+        ['reloadClick',  `${import.meta.env.BASE_URL}sounds/click.ogg`],
         ['missileExplosion', `${import.meta.env.BASE_URL}sounds/explosion_a.ogg`],
         ['tankExplosion', `${import.meta.env.BASE_URL}sounds/explosion_b.ogg`],
         ['tankEngine', `${import.meta.env.BASE_URL}sounds/tank_moving.ogg`],

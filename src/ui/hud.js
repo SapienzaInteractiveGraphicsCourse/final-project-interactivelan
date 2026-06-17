@@ -279,3 +279,47 @@ export class HUD {
         document.head.appendChild(style);
     }
 }
+
+// Renders a keybind legend for debug scenes.
+// bindings: array of [keyLabel, actionLabel] pairs.
+// Returns a { setLabel(keyLabel, newActionLabel) } handle for live updates.
+export function createDebugKeys(bindings) {
+    const el = document.createElement('div');
+    el.style.cssText = [
+        'position:fixed',
+        'bottom:16px',
+        'left:16px',
+        'font-family:monospace',
+        'font-size:12px',
+        'color:#ccc',
+        'background:rgba(0,0,0,0.5)',
+        'padding:7px 14px',
+        'border-radius:4px',
+        'pointer-events:none',
+        'line-height:1.85',
+        'z-index:9999',
+        'user-select:none',
+    ].join(';');
+
+    const rows = new Map();
+
+    for (const [key, label] of bindings) {
+        const row = document.createElement('div');
+        row.innerHTML = _keyRowHTML(key, label);
+        el.appendChild(row);
+        rows.set(key, row);
+    }
+
+    document.body.appendChild(el);
+
+    return {
+        setLabel(key, label) {
+            const row = rows.get(key);
+            if (row) row.innerHTML = _keyRowHTML(key, label);
+        },
+    };
+}
+
+function _keyRowHTML(key, label) {
+    return `<span style="color:#7bcfff;display:inline-block;min-width:76px">${key}</span>${label}`;
+}

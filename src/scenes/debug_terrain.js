@@ -9,6 +9,7 @@ import { Terrain } from '../core/terrain.js';
 import { placeTrees } from '../entities/clutter.js';
 import { loadTreeModels, loadGrassModels } from '../utilities/loader.js';
 import { createGrass } from '../entities/grass.js';
+import { createDebugKeys } from '../ui/hud.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
@@ -71,13 +72,22 @@ let navMap;
 let terrain;
 const grassModels = await loadGrassModels();
 
+const debugKeys = createDebugKeys([
+    ['[N]',   'Nav map  —  OFF'],
+    ['[LMB]', 'Orbit'],
+    ['[RMB]', 'Pan'],
+    ['[Scroll]', 'Zoom'],
+]);
+
 // If N is pressed, show the generated navMap
 window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyN' && navMap) {
         navMapVisible = !navMapVisible;
+        debugKeys.setLabel('[N]', `Nav map  —  ${navMapVisible ? 'ON' : 'OFF'}`);
 
         if (navMapVisible) {
             navMapMeshes = navMap.visualize(scene);
+            navMapMeshes.forEach(m => { m.position.y = 25; });
         } else {
             navMapMeshes.forEach(m => scene.remove(m));
             navMapMeshes = [];

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadModel } from '../utilities/loader.js';
 import { Launcher } from '../entities/launcher.js';
-import { HUD } from '../ui/hud.js';
+import { HUD, createDebugKeys } from '../ui/hud.js';
 import { applyCellShading } from '../rendering/shaders.js';
 import { updateExplosions } from '../rendering/effects.js';
 
@@ -162,6 +162,15 @@ function animate() {
     renderer.render(scene, launcher?.activeCamera ?? camera);
 }
 
+
+createDebugKeys([
+    ['[← →]',    'Rotate launcher'],
+    ['[↑ ↓]',    'Elevate gun'],
+    ['[RMB]',    'Toggle scope'],
+    ['[LMB]',    'Fire  (scoped)'],
+    ['[R]',      'Reload'],
+    ['[Click]',  'Lock pointer'],
+]);
 
 // All done, start the scene
 renderer.setAnimationLoop(animate);

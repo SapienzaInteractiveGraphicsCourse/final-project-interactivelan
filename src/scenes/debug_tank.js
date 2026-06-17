@@ -5,6 +5,7 @@ import { Tank }          from '../entities/tank.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 import { updateExplosions } from '../rendering/effects.js';
+import { createDebugKeys } from '../ui/hud.js';
 
 // Class to help debug tank hitboxes and such
 class TankDebugger {
@@ -171,5 +172,12 @@ function animate() {
 
     renderer.render(scene, camera);
 }
+
+createDebugKeys([
+    ['[← →]',   'Rotate turret'],
+    ['[↑ ↓]',   'Elevate gun'],
+    ['[H]',      'Simulate hit'],
+    ['[LMB]',    'Raycast hit test'],
+]);
 
 renderer.setAnimationLoop(animate);

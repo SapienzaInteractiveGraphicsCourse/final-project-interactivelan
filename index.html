@@ -65,6 +65,17 @@
       justify-content: flex-end;
       padding: 48px;
       border-right: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #menu-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: -1;
     }
 
     h1 {
@@ -153,7 +164,9 @@
       color: var(--dim);
     }
   </style>
-  <script type="module" crossorigin src="/final-project-interactivelan/assets/index-Cs18ngcF.js"></script>
+  <script type="module" crossorigin src="/final-project-interactivelan/assets/index-r7AuXOiS.js"></script>
+  <link rel="modulepreload" crossorigin href="/final-project-interactivelan/assets/loader-CbkMRmj5.js">
+  <link rel="modulepreload" crossorigin href="/final-project-interactivelan/assets/menu_bg-TV5dXsb4.js">
 </head>
 <body>
   <header>
@@ -163,6 +176,7 @@
 
   <div class="layout">
     <div class="left">
+      <canvas id="menu-bg"></canvas>
       <h1>STATIC<br>DEFENSE<span class="cursor"></span></h1>
       <div class="meta">
         <div>build &mdash;  debug</div>

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TV } from '../entities/tv.js';
+import { createDebugKeys } from '../ui/hud.js';
 
 // Debug scene to test the pocket TV model and video playback
 
@@ -55,7 +56,7 @@ async function init() {
     box.getSize(size);
 
     const maxDim = Math.max(size.x, size.y, size.z);
-    camera.position.set(center.x, center.y, center.z + maxDim * 2.5);
+    camera.position.set(center.x, center.y + 0.2, center.z + maxDim * 1.3);
     camera.lookAt(center);
     // Orbit around the TV, not world origin
     controls.target.copy(center);
@@ -78,6 +79,13 @@ async function init() {
     document.addEventListener('keydown', startOnGesture);
     document.addEventListener('click',   startOnGesture);
 }
+
+createDebugKeys([
+    ['[Any key]', 'Start video playback'],
+    ['[LMB]',     'Orbit'],
+    ['[RMB]',     'Pan'],
+    ['[Scroll]',  'Zoom'],
+]);
 
 init();
 

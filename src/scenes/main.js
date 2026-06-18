@@ -235,13 +235,7 @@ function showMenu() {
         const bgCanvas = document.createElement('canvas');
         bgCanvas.id = 'menu-bg';
         left.append(bgCanvas);
-        left.insertAdjacentHTML('beforeend', `
-            <h1>STATIC<br>DEFENSE<span class="menu-cursor"></span></h1>
-            <div class="meta">
-                <div>mode &mdash; campaign</div>
-                <div>waves &mdash; 3</div>
-            </div>
-        `);
+
 
         // Right panel
         const right = document.createElement('div');

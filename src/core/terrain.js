@@ -180,8 +180,9 @@ export class Terrain {
             const n = (colorNoise(x * 0.02, z * 0.02) + 1) * 0.5;
             const h = THREE.MathUtils.clamp((y + this.amplitude) / (2 * this.amplitude), 0, 1);
 
-            // Low ground is dirt, everything above is grass
-            const t1    = smoothstep(0.22, 0.50, h);
+            // Flat ground is grassy; dirt reserved for the lowest depressions and eroded slopes
+            const tFlat = 1.0 - smoothstep(0.0, 0.28, slope);
+            const t1    = Math.max(smoothstep(0.05, 0.35, h), tFlat * 0.70);
             // Steep slopes become rocky regardless of elevation
             const tRock = smoothstep(0.40, 0.90, slope);
 

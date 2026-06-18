@@ -37,7 +37,7 @@ The map is different every run, generated from simplex noise before the match st
 
 ## The launcher
 
-The weapon is a 9M133 Kornet, a Russian anti-tank guided missile system. The model and all its textures were handmade in Blender, built from reference images to match the launcher's silhouette, proportions, and surface detail as closely as possible within a low-poly budget.
+The weapon is a 9M133 Kornet, a Russian anti-tank guided missile system. The model and all its textures were handmade in Blender, built from reference images to match the launcher's silhouette within a low-poly budget.
 
 <table width="100%"><tr>
   <td align="center"><img src="images/model.png" alt="In-game 3D model" width="100%" height="480" style="object-fit:cover"><br><sub>In-game model</sub></td>
@@ -62,9 +62,10 @@ The map is built from two octaves of simplex noise, quantized into discrete heig
 
 Every run is different. Size, frequency, and amplitude are exposed in the pre-game menu.
 
-<p align="center">
-  <img src="images/terrain.png" alt="Terrain generation" width="100%">
-</p>
+<table width="100%"><tr>
+  <td align="center" width="50%"><img src="images/terrain.png" alt="Terrain generation" width="100%"><br><sub>Procedurally generated terrain</sub></td>
+  <td align="center" width="50%"><img src="images/navmap.png" alt="Navigation map" width="100%"><br><sub>A* navigation grid overlay</sub></td>
+</tr></table>
 
 ---
 
@@ -89,7 +90,7 @@ The scene selector includes additional scenes for isolated testing:
 |:---|:---|
 | Terrain | Live sliders for size, frequency, amplitude, and clutter density. Navmap overlay toggle. |
 | Launcher | Full launcher controls, no terrain. Six tanks spawn at staggered distances. |
-| Tank | Single tank patrolling toward a fixed point, for hitbox and behavior inspection. |
+| Tank | Single tank in a fixed point, for hitbox and behavior inspection. |
 | TV | The intro TV prop in isolation. |
 | Model Viewer | Orbit any model. Cycles through all props, supports wireframe toggle and camera reset. |
 

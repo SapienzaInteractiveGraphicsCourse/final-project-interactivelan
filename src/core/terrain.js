@@ -81,8 +81,8 @@ export class Terrain {
                 this.navMap      = new NavigationMap(this.size, this.cellSize);
             }
 
-            this._generateHeights();
-            this._applyVertexColors();
+            this.generateHeights();
+            this.applyVertexColors();
 
             this.geometry.attributes.position.needsUpdate = true;
             this.geometry.computeVertexNormals();
@@ -133,7 +133,7 @@ export class Terrain {
     }
 
     // Generate height values into the geometry and heights array
-    _generateHeights() {
+    generateHeights() {
         for (let i = 0; i < this.vertCount; i++) {
             const x = this.geometry.attributes.position.getX(i);
             const z = this.geometry.attributes.position.getZ(i);
@@ -152,7 +152,7 @@ export class Terrain {
     }
 
     // Vertex color variation to make our world look more alive
-    _applyVertexColors() {
+    applyVertexColors() {
         const colorBuffer    = new Float32Array(this.vertCount * 3);
         const colorNoise     = createNoise2D();
         const verticesPerRow = this.segments + 1;

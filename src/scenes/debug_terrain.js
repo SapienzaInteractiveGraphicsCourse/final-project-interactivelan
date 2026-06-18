@@ -82,6 +82,7 @@ let navMapVisible = false;
 let navMapMeshes  = [];
 let navMap;
 let terrain;
+let navBtn        = null;
 const grassModels = await loadGrassModels();
 
 const debugKeys = createDebugKeys([
@@ -111,20 +112,23 @@ async function regenerate() {
     await init();
 }
 
-window.addEventListener('keydown', async (e) => {
-    if (e.code === 'KeyN' && navMap) {
-        navMapVisible = !navMapVisible;
-        debugKeys.setLabel('[N]', `Nav map  —  ${navMapVisible ? 'ON' : 'OFF'}`);
+function toggleNavMap() {
+    if (!navMap) return;
+    navMapVisible = !navMapVisible;
+    debugKeys.setLabel('[N]', `Nav map  —  ${navMapVisible ? 'ON' : 'OFF'}`);
+    if (navBtn) navBtn.textContent = `NAVMAP: ${navMapVisible ? 'ON' : 'OFF'}`;
 
-        if (navMapVisible) {
-            navMapMeshes = navMap.visualize(scene);
-            navMapMeshes.forEach(m => { m.position.y = 25; });
-        } else {
-            navMapMeshes.forEach(m => scene.remove(m));
-            navMapMeshes = [];
-        }
+    if (navMapVisible) {
+        navMapMeshes = navMap.visualize(scene);
+        navMapMeshes.forEach(m => { m.position.y = 25; });
+    } else {
+        navMapMeshes.forEach(m => scene.remove(m));
+        navMapMeshes = [];
     }
+}
 
+window.addEventListener('keydown', async (e) => {
+    if (e.code === 'KeyN') toggleNavMap();
     if (e.code === 'KeyG') regenerate();
 });
 
@@ -269,16 +273,23 @@ async function init() {
         { label: 'PEB COUNT',  min: 50,  max: 1500, step: 50,   fmt: v => v,             get: () => pebbleCount,   set: v => { pebbleCount   = v; } },
     ]);
 
-    const btn = document.createElement('button');
-    btn.textContent = 'REGENERATE';
-    btn.style.cssText = [
+    const btnStyle = [
         'padding:6px 0', 'width:100%',
         'font-family:monospace', 'font-size:12px', 'cursor:pointer',
         'background:#333', 'color:#ccc', 'border:1px solid #666', 'border-radius:4px',
     ].join(';');
+
+    const btn = document.createElement('button');
+    btn.textContent = 'REGENERATE';
+    btn.style.cssText = btnStyle;
     btn.addEventListener('click', () => regenerate());
 
-    container.append(terrainPanel, clutterPanel, btn);
+    navBtn = document.createElement('button');
+    navBtn.textContent = 'NAVMAP: OFF';
+    navBtn.style.cssText = btnStyle;
+    navBtn.addEventListener('click', () => toggleNavMap());
+
+    container.append(terrainPanel, clutterPanel, btn, navBtn);
     document.body.appendChild(container);
 }());
 

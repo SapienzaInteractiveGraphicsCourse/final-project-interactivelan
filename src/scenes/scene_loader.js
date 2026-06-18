@@ -12,6 +12,7 @@ if (scene) {
     if (scene === 'launcher') import('./debug_launcher.js');
     if (scene === 'tank') import('./debug_tank.js');
     if (scene === 'main') import ('./main.js');
-    if (scene === 'tv') import('./debug_tv.js');
+    if (scene === 'tv')    import('./debug_tv.js');
+    if (scene === 'model') import('./debug_model.js');
     // if (scene === 'targets')  import('./targets.js');
 }

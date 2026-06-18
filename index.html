@@ -65,6 +65,17 @@
       justify-content: flex-end;
       padding: 48px;
       border-right: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #menu-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: -1;
     }
 
     h1 {
@@ -162,6 +173,7 @@
 
   <div class="layout">
     <div class="left">
+      <canvas id="menu-bg"></canvas>
       <h1>STATIC<br>DEFENSE<span class="cursor"></span></h1>
       <div class="meta">
         <div>build &mdash;  debug</div>
@@ -201,5 +213,9 @@
   </footer>
 
   <script type="module" src="./src/scenes/scene_loader.js"></script>
+  <script type="module">
+    import { startMenuBg } from './src/scenes/menu_bg.js';
+    startMenuBg(document.getElementById('menu-bg'));
+  </script>
 </body>
 </html>

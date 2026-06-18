@@ -20,7 +20,7 @@ export async function runIntro(renderer, camera, init) {
     box.getCenter(center);
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
-    camera.position.set(center.x -0.2, center.y + 0.2, center.z + maxDim * 1.2);
+    camera.position.set(center.x, center.y + 0.2, center.z + maxDim * 1.3);
     camera.lookAt(center);
 
     const hemiLight = new THREE.HemisphereLight(0xbfd8ff, 0x1a1a1a, 0.55);

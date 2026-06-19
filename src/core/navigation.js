@@ -304,7 +304,7 @@ export class NavigationMap {
 
             closedSet.add(currentKey);
 
-            // Check all 4 neighbors (4 cardinal)
+            // Check all 8 neighbors (4 cardinal + 4 diagonal)
             for (let columnStep = -1; columnStep <= 1; columnStep++) {
                 for (let rowStep = -1; rowStep <= 1; rowStep++) {
                     if (columnStep === 0 && rowStep === 0) continue;

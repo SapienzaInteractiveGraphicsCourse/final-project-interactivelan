@@ -52,9 +52,15 @@ export async function placeTrees(scene, terrainData, treeModels, treeScale, thre
         // After jitter, make sure the actual placed tree is still outside the safe zone
         if (Math.hypot(treeX - launcherSpawn.x, treeZ - launcherSpawn.z) < launcherSafeRadius) continue;
 
-        // Skip protected corridor cells
-        const treeCellKey = navigationMap.cellKey(treeX, treeZ);
-        if (protectedCells && protectedCells.has(treeCellKey)) continue;
+        // Skip if the tree or its 1-cell setBlocked buffer would overlap the protected corridor
+        if (protectedCells) {
+            const [tc, tr] = navigationMap.worldToGrid(treeX, treeZ);
+            let hitsCorridor = false;
+            outer: for (let dc = -1; dc <= 1; dc++)
+                for (let dr = -1; dr <= 1; dr++)
+                    if (protectedCells.has(`${tc + dc},${tr + dr}`)) { hitsCorridor = true; break outer; }
+            if (hitsCorridor) continue;
+        }
 
         // Use actual terrain height at final tree position
         const treeY       = terrainData.getHeightAt(treeX, treeZ) - 0.3;

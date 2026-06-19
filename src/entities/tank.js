@@ -55,6 +55,8 @@ export class Tank {
 
         // Wrap model in a group so we control its transform via class properties
         this.group = new THREE.Group();
+        // YXZ applies yaw first so pitch/roll are in the tank's own local frame, not world space
+        this.group.rotation.order = 'YXZ';
         this.group.add(model);
 
         // Our tank model faces 90 degrees off, Blender and threejs magic

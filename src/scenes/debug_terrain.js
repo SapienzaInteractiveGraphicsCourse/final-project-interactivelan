@@ -267,7 +267,7 @@ async function init() {
     ]);
 
     const clutterPanel = makePanel([
-        { label: 'TREE DENS',  min: 0.3, max: 0.9,  step: 0.05, fmt: v => v.toFixed(2), get: () => treeThreshold, set: v => { treeThreshold = v; } },
+        { label: 'TREE THRSH', min: 0.3, max: 0.9,  step: 0.05, fmt: v => v.toFixed(2), get: () => treeThreshold, set: v => { treeThreshold = v; } },
         { label: 'GRASS DENS', min: 10,  max: 200,  step: 10,   fmt: v => v,             get: () => grassDensity,  set: v => { grassDensity  = v; } },
         { label: 'ROCK COUNT', min: 50,  max: 1000, step: 50,   fmt: v => v,             get: () => rockCount,     set: v => { rockCount     = v; } },
         { label: 'PEB COUNT',  min: 50,  max: 1500, step: 50,   fmt: v => v,             get: () => pebbleCount,   set: v => { pebbleCount   = v; } },

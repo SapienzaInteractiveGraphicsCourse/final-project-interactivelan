@@ -112,5 +112,5 @@ The scene selector includes additional scenes for isolated testing:
 ---
 
 <p align="center">
-  <b>Lorenzo Carlini</b> &nbsp;·&nbsp; Interactive Graphics, Sapienza 2025–2026
+  <b>Lorenzo Carlini 1883140</b> &nbsp;·&nbsp; Interactive Graphics, Sapienza 2025–2026
 </p>
